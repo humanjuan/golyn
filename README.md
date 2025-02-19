@@ -1,8 +1,6 @@
-<div style="display: flex; align-items: center; width: 100%; justify-content: center;">
-    <h1 style="margin: 0; color: #8486a9">Golyn</h1>  
-    <img src="./sites/golyn/assets/Golyn.png" alt="Image" width="80">
-    <h1 style="margin: 0; color: #8486a9">Server</h1>
-</div>
+<h1 align="center">
+  Golyn <img src="https://github.com/jpengineer/golyn/blob/main/sites/golyn/assets/Golyn.png?raw=true" alt="Golyn Logo" width="80"> Server
+</h1>
 
 ![Golang](https://img.shields.io/badge/Language-Go-blue?logo=go)
 ![Open Source](https://img.shields.io/badge/Open%20Source-Yes-brightgreen?logo=opensourceinitiative)
