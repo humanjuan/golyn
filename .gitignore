@@ -23,3 +23,12 @@ go.work.sum
 
 # env file
 .env
+
+/var/log/golyn_db.log
+/var/log/golyn_server.log
+/sites/kayak/
+/sites/portal.golyn/
+/pkg/mod/
+/pkg/sumdb/
+.idea/
+.DS_Store
