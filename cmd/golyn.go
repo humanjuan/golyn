@@ -26,7 +26,7 @@ import (
 // Documentation: https://gin-gonic.com/docs/quickstart/
 
 const (
-	version    string = "v1.0.0-16022025A"
+	version    string = "v1.0.0-05032025A"
 	mainDomain string = "golyn.local"
 )
 
