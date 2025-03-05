@@ -4,6 +4,7 @@ import (
 	"Back/app"
 	"Back/config/loaders"
 	"Back/database"
+	"Back/globals"
 	"Back/internal"
 	"Back/internal/handlers"
 	"Back/internal/utils"
@@ -13,7 +14,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/jpengineer/logger"
 	"github.com/patrickmn/go-cache"
 	"net/http"
 	"os"
@@ -26,70 +26,73 @@ import (
 // Documentation: https://gin-gonic.com/docs/quickstart/
 
 const (
-	version         string = "v1.0.0-16022025A"
-	certificatePath string = "./certificates/cert.pem"
-	certificateKey  string = "./certificates/privkey.pem"
-	mainDomain      string = "humanjuan.com"
+	version    string = "v1.0.0-16022025A"
+	mainDomain string = "golyn.local"
 )
 
 func main() {
-	var log *logger.Log
-	var logDB *logger.Log
-
 	// LOAD CONFIG
 	conf, err := loaders.LoadConfig()
 	if err != nil {
 		panic(fmt.Sprintf("[ERROR] An error occurred while trying to load the server configuration. %v", err))
 	}
+	globals.SetConfig(conf)
 
 	// LOGGER
-	log, err = loaders.InitLog(strings.ToLower(conf.Server.Name), conf.Log.Path, conf.Log.Level, conf.Log.MaxSizeMb, conf.Log.MaxBackup)
+	logApp, err := loaders.InitLog(strings.ToLower(conf.Server.Name), conf.Log.Path, conf.Log.Level, conf.Log.MaxSizeMb, conf.Log.MaxBackup)
 	if err != nil {
-		panic(fmt.Sprintf("Logger (Server) initialization failed: %v", err.Error()))
+		panic(fmt.Sprintf("main() | Logger (Server) initialization failed | Error: %v", err.Error()))
 	}
-	logDB, err = loaders.InitLogDB(strings.ToLower(conf.Server.Name), conf.Log.Path, conf.Log.Level, conf.Log.MaxSizeMb, conf.Log.MaxBackup)
+	logDB, err := loaders.InitLogDB(strings.ToLower(conf.Server.Name), conf.Log.Path, conf.Log.Level, conf.Log.MaxSizeMb, conf.Log.MaxBackup)
 	if err != nil {
-		panic(fmt.Sprintf("Logger (DB) initialization failed: %v", err.Error()))
+		panic(fmt.Sprintf("main() | Logger (DB) initialization failed | Error: %v", err.Error()))
 	}
-	defer log.Close()
+	defer logApp.Close()
 	defer logDB.Close()
+
+	// CONFIG GLOBAL LOGGER
+	globals.SetAppLogger(logApp)
+	globals.SetDBLogger(logDB)
 
 	pid := os.Getpid()
 	fmt.Printf("Welcome Back! - %v Server %v  - PID %v \n", conf.Server.Name, version, pid)
-	log.Info("Welcome Back! - %v Server %v  - PID %v", conf.Server.Name, version, pid)
+	logApp.Info("Welcome Back! - %v Server %v  - PID %v", conf.Server.Name, version, pid)
 
 	// START DB CONNECTION
 	dbInstance := database.NewDBInstance()
 
-	if err := dbInstance.InitDB(conf, logDB); err != nil {
-		log.Error("An error occurred while establishing the connection to the database.")
+	if err = dbInstance.InitDB(&conf.Database, logApp); err != nil {
+		logDB.Error("main() | An error occurred while establishing the connection to the database. | Error: %v", err.Error())
 	}
 	defer dbInstance.Close()
 
-	globalApp := &app.Application{
-		DB:     dbInstance,
-		LogDB:  logDB,
-		LogApp: log,
-		Config: conf,
+	globals.SetDBInstance(dbInstance)
+
+	// LOAD CERTIFICATES
+	globals.InitCertificates()
+	if err = internal.LoadAllCertificates(conf.Sites); err != nil {
+		logApp.Error("main() | An error has occurred while loading certificates. | Error: %v", err.Error())
 	}
 
-	certificate := &app.Cert{
-		Path: certificatePath,
-		Key:  certificateKey,
-	}
+	fmt.Println("Invalid Certificates: ", globals.InvalidCertificates)
+
+	logApp.Debug("main() | globals.InvalidCertificates: %v", globals.InvalidCertificates)
 
 	// GET PUBLIC IP
-	publicIP, localIP := utils.GetIPAddresses(globalApp.LogApp)
+	publicIP, localIP, err := utils.GetIPAddresses()
+	if err != nil {
+		logApp.Error("main() | An error occurred while fetching the public IP address. Error: %v", err.Error())
+	}
 
-	log.Info("Dev mode: %t | Server Name: %s | Server port: %d | Local IP: %s | Public IP: %s",
+	logApp.Info("main() | Dev mode: %t | Server Name: %s | Server port: %d | Local IP: %s | Public IP: %s",
 		conf.Server.Dev, conf.Server.Name, conf.Server.Port, localIP, publicIP)
 
 	// SERVER MODE
 	if conf.Server.Dev {
-		log.Warn("Running in 'dev' mode. Switch 'dev = false' in conf file to production.")
+		logApp.Warn("main() | Running in 'dev' mode. Switch 'dev = false' in conf file to production.")
 		gin.SetMode(gin.DebugMode)
 	} else {
-		log.Info("Running in 'Production' mode.")
+		logApp.Info("main() | Running in 'Production' mode.")
 		gin.SetMode(gin.ReleaseMode)
 	}
 
@@ -100,12 +103,12 @@ func main() {
 	if conf.Server.MaxGoRoutineParallel != 0 && conf.Server.MaxGoRoutineParallel < maxCPUCore {
 		maxGoroutinesInParallel = conf.Server.MaxGoRoutineParallel
 	}
-	log.Info("Total Server CPU cores: %d | Total number of goroutines configured to run in parallel: %d", maxCPUCore, maxGoroutinesInParallel)
+	logApp.Info("main() | Total Server CPU cores: %d | Total number of goroutines configured to run in parallel: %d", maxCPUCore, maxGoroutinesInParallel)
 
 	runtime.GOMAXPROCS(maxGoroutinesInParallel)
 
-	if globalApp.Config.Server.MaxGoRoutineParallel != maxCPUCore && globalApp.Config.Server.MaxGoRoutineParallel != 0 {
-		log.Warn("For best performance, the CPU cores and GoRoutine should have the same value.")
+	if conf.Server.MaxGoRoutineParallel != maxCPUCore && conf.Server.MaxGoRoutineParallel != 0 {
+		logApp.Warn("main() | For best performance, the CPU cores and GoRoutine should have the same value.")
 	}
 
 	// INFO
@@ -113,12 +116,19 @@ func main() {
 	runtime.ReadMemStats(&mem)
 	memAllocatedInMB := float64(mem.Alloc) / 1024 / 1024
 
+	var golynCertPath string
+	for _, site := range conf.Sites {
+		if site.Directory == "golyn" {
+			golynCertPath = site.Security.TLS_SSL.Cert
+		}
+	}
+
 	serverInfo := &app.Info{
 		ServerVersion:           version,
 		GinVersion:              gin.Version,
 		GoVersion:               runtime.Version(),
 		ServerStartTime:         time.Now(),
-		CertificatePath:         certificate.Path,
+		CertificatePath:         golynCertPath,
 		NumGoroutinesInParallel: runtime.GOMAXPROCS(0),
 		MemStatsInMB:            memAllocatedInMB,
 		NumCPU:                  runtime.NumCPU(),
@@ -128,109 +138,120 @@ func main() {
 	serverRouter := gin.Default()
 
 	// VIRTUAL HOSTS
-	virtualHosts, defaultSite := virtualhosts.Setup(serverRouter, globalApp.Config, globalApp.LogApp)
+	globals.VirtualHosts, globals.DefaultSite = virtualhosts.Setup(serverRouter)
+
+	// LOAD ERROR TEMPLATE
+	err = handlers.LoadErrorTemplate(globals.DefaultSite)
+	if err != nil {
+		globals.RenderTemplate = false
+	}
 
 	// APPLY MIDDLEWARE
-	serverRouter.Use(middlewares.LoggingMiddleware(globalApp.LogApp))
-	serverRouter.Use(middlewares.SecureMiddleware(globalApp.LogApp, globalApp.Config.Server.Dev))
-	serverRouter.Use(middlewares.RedirectOrAllowHostMiddleware(globalApp.LogApp, virtualHosts))
-
-	// TODO estoy trabajando aqui para habilitar os CORS y permitir el F5 (envio de credenciales en las cookies)
-	serverRouter.Use(middlewares.CorsMiddleware(globalApp.Config.Sites, globalApp.LogApp))
-	// []string{"https://www.humanjuan.com", "https://humanjuan.com", "https://golyn.humanjuan.com", "https://portal.humanjuan.com"}
+	serverRouter.Use(middlewares.CustomErrorHandler())
+	serverRouter.Use(middlewares.LoggingMiddleware())
+	serverRouter.Use(middlewares.SecureMiddleware(conf.Server.Dev))
+	serverRouter.Use(middlewares.RedirectOrAllowHostMiddleware())
+	serverRouter.Use(middlewares.CorsMiddleware(conf.Sites))
 
 	// CREATE SERVER CACHE AND APPLY MORE MIDDLEWARE
-	serverRouter.Use(middlewares.CacheMiddleware(globalApp.LogApp,
+	serverRouter.Use(middlewares.CacheMiddleware(
 		cache.New(
-			time.Duration(globalApp.Config.Cache.ExpirationTime)*time.Minute,
-			time.Duration(globalApp.Config.Cache.CleanUpInterval)*time.Minute,
+			time.Duration(conf.Cache.ExpirationTime)*time.Minute,
+			time.Duration(conf.Cache.CleanUpInterval)*time.Minute,
 		)),
 	)
-	log.Info("The server cache has been configured with an expiration time of %v minutes and %v minutes "+
+	logApp.Info("main() | The server cache has been configured with an expiration time of %v minutes and %v minutes "+
 		"to clean up interval.", conf.Cache.ExpirationTime, conf.Cache.CleanUpInterval)
 
-	routes.ConfigureRoutes(serverRouter, globalApp, serverInfo, mainDomain)
-
-	// ADD CUSTOM NoRoute HANDLER
-	serverRouter.NoRoute(func(c *gin.Context) {
-		host := c.Request.Host
-		path := c.Request.URL.Path
-
-		log.Warn("NoRoute() | Request Not Found | Host: %s | Path: %s | Method: %s", host, path, c.Request.Method)
-
-		if len(path) >= 4 && path[:4] == "/api" {
-			c.IndentedJSON(http.StatusNotFound, gin.H{
-				"message": utils.GetCodeMessage(http.StatusNotFound),
-				"error":   "Resource not found",
-			})
-			c.Abort()
-			return
-		}
-
-		vh, ok := virtualHosts[host]
-		if ok {
-			handlers.ServeErrorPage(c, log, http.StatusNotFound, "", vh.BasePath, defaultSite)
-			return
-		}
-		handlers.ServeErrorPage(c, log, http.StatusNotFound, "", defaultSite, defaultSite)
-	})
+	routes.ConfigureRoutes(serverRouter, serverInfo, mainDomain)
 
 	// SET INITIAL SERVER PARAMETERS FOR SITES SERVER
-	serverHTTPS, err := internal.SetupServerHTTPS(globalApp.Config, serverRouter, certificate)
+	serverHTTPS, err := internal.SetupServerHTTPS(serverRouter)
 	if err != nil {
-		log.Error(err.Error())
-		panic(err.Error())
+		logApp.Warn("main() | No valid certificates found globally, but HTTPS server will handle errors. Falling back to HTTP for invalid sites. | Error: %v", err.Error())
 	}
-	log.Info("TLS server configured on port %d", conf.Server.Port)
+	logApp.Info("main() | TLS server configured on port %d", conf.Server.Port)
 
-	// START HTTP TO HTTPS REDIRECT
-	serverHTTP, err := internal.SetupServerHTTP()
+	// START HTTP TO HTTPS REDIRECT OR FALLBACK
+	serverHTTP, err := internal.SetupServerHTTP(serverRouter)
 	if err != nil {
-		log.Error(err.Error())
+		logApp.Error("main() | An error has occurred while trying to configure the HTTP server. | Error: %v", err.Error())
 		panic(err.Error())
 	}
-	log.Info("Server HTTP to redirect it's Up on port 80")
+	logApp.Info("main() | Server HTTP to redirect it's Up on port 80")
 
 	mode := "Release"
-	if globalApp.Config.Server.Dev {
+	if conf.Server.Dev {
 		mode = "Development"
 	}
 
 	var wg sync.WaitGroup
 
-	// Ejecutar el servidor HTTPS
+	// START HTTPS SERVER
+	if serverHTTPS != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			logApp.Debug("main() | Starting HTTPS server on %s (%v mode)", serverHTTPS.Addr, mode)
+			err := serverHTTPS.ListenAndServeTLS("", "")
+			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+				logApp.Error("main() | An error has occurred while trying to start the HTTPS server. | Error: %v", err.Error())
+				os.Exit(1)
+			}
+		}()
+	} else {
+		logApp.Warn("main() | HTTPS server not started due to no valid certificates globally.")
+	}
+
+	// START HTTP SERVER
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		fmt.Printf("Starting HTTPS server on %s (%v mode)\n", serverHTTPS.Addr, mode)
-		err := serverHTTPS.ListenAndServeTLS(certificate.Path, certificate.Key)
+		if serverHTTP == nil {
+			logApp.Error("main() | serverHTTP is nil in HTTP server goroutine")
+			os.Exit(1)
+			return
+		}
+		logApp.Debug("main() | Starting HTTP server on %s", serverHTTP.Addr)
+		err = serverHTTP.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Error("HTTPS Server Error: %v", err)
+			logApp.Error("main() | An error has occurred while trying to start the HTTP server. | Error: %v", err.Error())
 			os.Exit(1)
 		}
 	}()
 
-	// Ejecutar el servidor HTTP
+	/*// START HTTPS SERVER
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		fmt.Printf("Starting HTTP server for redirect on %s\n", serverHTTP.Addr)
-		err := serverHTTP.ListenAndServe()
+		logApp.Debug("main() | Starting HTTPS server on %s (%v mode)", serverHTTPS.Addr, mode)
+		err = serverHTTPS.ListenAndServeTLS("", "")
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Error("HTTP Server Error: %v", err)
+			logApp.Error("main() | An error has occurred while trying to start the HTTPS server. | Error: %v", err.Error())
 			os.Exit(1)
 		}
 	}()
 
-	// Manejo de apagado
+	// START HTTP SERVEER
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		internal.CatchSignalDual(serverHTTPS, serverHTTP, globalApp.LogApp)
+		logApp.Debug("main() | Starting HTTP server for redirect on %s", serverHTTP.Addr)
+		err = serverHTTP.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logApp.Error("main() | An error has occurred while trying to start the HTTP server. | Error: %v", err.Error())
+			os.Exit(1)
+		}
+	}()*/
+
+	// SHUTDOWN HANDLER
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		internal.CatchSignalDual(serverHTTPS, serverHTTP)
 	}()
 
-	// Esperar todas las gorutinas
 	wg.Wait()
-	log.Info("Server exited.")
+	logApp.Info("main() | Server exited.")
 
 }

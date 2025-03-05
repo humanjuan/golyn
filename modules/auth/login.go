@@ -1,11 +1,12 @@
 package auth
 
 import (
-	"Back/app"
 	"Back/database"
+	"Back/globals"
 	"Back/internal/utils"
 	"Back/middlewares"
 	"encoding/json"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/patrickmn/go-cache"
@@ -14,23 +15,23 @@ import (
 	"time"
 )
 
-func Login(app *app.Application) gin.HandlerFunc {
+func Login() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		_cache := middlewares.GetCache(c)
-		log := app.LogApp
-		logDB := app.LogDB
+		log := globals.GetAppLogger()
+		logDB := globals.GetDBLogger()
+		config := globals.GetConfig()
 		loginUser := database.LoginUser{}
 
 		if err := c.BindJSON(&loginUser); err != nil {
 			log.Error("Login() | Invalid or unexpectedly formatted JSON provided in request body. %s", err.Error())
-			c.JSON(http.StatusBadRequest, gin.H{
-				"message": utils.GetCodeMessage(http.StatusBadRequest),
-				"error":   "Invalid or unexpectedly formatted JSON provided in request body",
-			})
+			err = fmt.Errorf("invalid or unexpectedly formatted JSON provided in request body")
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, err.Error()))
+			c.Abort()
 			return
 		}
 
-		db := app.DB
+		db := globals.GetDBInstance()
 		var user []database.User
 
 		var attempts = 0
@@ -39,11 +40,9 @@ func Login(app *app.Application) gin.HandlerFunc {
 		err := db.Select(database.Queries["login"], &user, loginUser.Name)
 		if err != nil {
 			logDB.Error("Login() | An error has occurred in the database. Try again later: %s", err.Error())
-
-			c.IndentedJSON(http.StatusInternalServerError, gin.H{
-				"message": utils.GetCodeMessage(http.StatusInternalServerError),
-				"error":   "An error has occurred in the database. Try again later.",
-			})
+			err = fmt.Errorf("an error has occurred in the database. Try again later")
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
+			c.Abort()
 			return
 		}
 
@@ -57,14 +56,13 @@ func Login(app *app.Application) gin.HandlerFunc {
 				attempts = 1
 				_cache.Set(c.ClientIP(), attempts, cache.DefaultExpiration)
 			}
-			log.Error("Login() | ClientIP: %s | User: %s (Not Found)| Login: Failed | Attempts: %d | Sleep: 5s | Cache Items: %d",
+			log.Warn("Login() | ClientIP: %s | User: %s (Not Found)| Login: Failed | Attempts: %d | Sleep: 5s | Cache Items: %d",
 				c.ClientIP(), loginUser.Name, attempts, _cache.ItemCount())
 			time.Sleep(5 * time.Second)
 
-			c.IndentedJSON(http.StatusUnauthorized, gin.H{
-				"message": utils.GetCodeMessage(http.StatusUnauthorized),
-				"error":   "Login failed",
-			})
+			err = fmt.Errorf("login failed")
+			c.Error(utils.NewHTTPError(http.StatusUnauthorized, err.Error()))
+			c.Abort()
 			return
 		}
 
@@ -84,10 +82,9 @@ func Login(app *app.Application) gin.HandlerFunc {
 				c.ClientIP(), loginUser.Name, attempts, _cache.ItemCount())
 			time.Sleep(5 * time.Second)
 
-			c.IndentedJSON(http.StatusUnauthorized, gin.H{
-				"message": utils.GetCodeMessage(http.StatusUnauthorized),
-				"error":   "Login failed",
-			})
+			err = fmt.Errorf("login failed")
+			c.Error(utils.NewHTTPError(http.StatusUnauthorized, err.Error()))
+			c.Abort()
 			return
 		}
 
@@ -102,12 +99,12 @@ func Login(app *app.Application) gin.HandlerFunc {
 		log.Info("ClientIP: %s | User: %s | Login: Success | Attempts: %v | Sleep: 0s | Cache Items: %d",
 			c.ClientIP(), loginUser.Name, attempts, _cache.ItemCount())
 
-		accessToken, refreshToken, err := CreateToken(loginUser.Name, app)
+		accessToken, refreshToken, err := CreateToken(loginUser.Name)
 		if err != nil {
 			log.Error("Login() | An error has occurred in the server when trying to get access tokens. Try again later: %s", err.Error())
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"message": utils.GetCodeMessage(http.StatusInternalServerError),
-				"error":   "An error has occurred in the server when trying to get access tokens"})
+			err = fmt.Errorf("an error has occurred in the server when trying to get access tokens")
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
+			c.Abort()
 			return
 		}
 
@@ -115,14 +112,13 @@ func Login(app *app.Application) gin.HandlerFunc {
 		jsonUser, err := json.Marshal(user[0])
 		if err != nil {
 			log.Error("Login() | An error has occurred in the server when trying to build the final user object. Try again later: %s", err.Error())
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"message": utils.GetCodeMessage(http.StatusInternalServerError),
-				"error":   "An error has occurred in the server when trying to build the final user object. Try again later.",
-			})
+			err = fmt.Errorf("an error has occurred in the server when trying to build the final user object")
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
+			c.Abort()
 			return
 		}
 
-		expirationTimeSec := app.Config.Server.TokenExpirationRefreshTime
+		expirationTimeSec := config.Server.TokenExpirationRefreshTime
 		c.SetSameSite(http.SameSiteLaxMode)
 		//domain := c.Request.Host
 		c.SetCookie("refreshToken", refreshToken, expirationTimeSec, "/", "", true, true)
@@ -135,45 +131,43 @@ func Login(app *app.Application) gin.HandlerFunc {
 	}
 }
 
-func RefreshToken(app *app.Application) gin.HandlerFunc {
+func RefreshToken() gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		log := app.LogApp
+		log := globals.GetAppLogger()
+		config := globals.GetConfig()
 
 		refreshToken, err := c.Cookie("refreshToken")
 		if err != nil {
 			log.Error("RefreshToken() | Refresh token not provided in cookie: %v", err.Error())
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"message": "Refresh token not provided in cookie",
-				"error":   err.Error(),
-			})
+			err = fmt.Errorf("refresh token not provided in cookie")
+			c.Error(utils.NewHTTPError(http.StatusUnauthorized, err.Error()))
+			c.Abort()
 			return
 		}
 
-		claims, err := ValidateRefreshToken(refreshToken, app)
+		claims, err := ValidateRefreshToken(refreshToken)
 		if err != nil {
 			log.Error("RefreshToken() | Invalid or expired refresh token: %v", err.Error())
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"message": "Invalid or expired refresh token",
-				"error":   err.Error(),
-			})
+			err = fmt.Errorf(" Invalid or expired refresh token")
+			c.Error(utils.NewHTTPError(http.StatusUnauthorized, err.Error()))
+			c.Abort()
 			return
 		}
 
 		newAccessToken, newRefreshToken, err := IssueNewTokens(refreshToken, jwt.MapClaims{
 			"username": claims.Username,
-			"exp":      time.Now().Add(time.Duration(app.Config.Server.TokenExpirationTime) * time.Minute).Unix(),
-		}, app)
+			"exp":      time.Now().Add(time.Duration(config.Server.TokenExpirationTime) * time.Minute).Unix(),
+		})
 		if err != nil {
-			log.Error("RefreshToken() | Unable to issue new tokens, try again: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"message": "Unable to issue new tokens, try again",
-				"error":   err.Error(),
-			})
+			log.Error("RefreshToken() | Unable to issue new tokens. Try again: %v", err)
+			err = fmt.Errorf("unable to issue new tokens")
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
+			c.Abort()
 			return
 		}
 
-		expirationTimeSec := app.Config.Server.TokenExpirationRefreshTime * 60
+		expirationTimeSec := config.Server.TokenExpirationRefreshTime * 60
 		c.SetSameSite(http.SameSiteLaxMode)
 		//domain := c.Request.Host
 		c.SetCookie("refreshToken", newRefreshToken, expirationTimeSec, "/", "", true, true)

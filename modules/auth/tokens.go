@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"Back/app"
+	"Back/globals"
 	"errors"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
@@ -18,10 +18,10 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func CreateToken(username string, app *app.Application) (string, string, error) {
-	config := app.Config
-	log := app.LogApp
-	db := app.DB
+func CreateToken(username string) (string, string, error) {
+	config := globals.GetConfig()
+	log := globals.GetAppLogger()
+	db := globals.GetDBInstance()
 	tokenExpirationTime := config.Server.TokenExpirationTime
 	tokenExpirationRefreshTime := config.Server.TokenExpirationRefreshTime
 	expirationTime := time.Now().Add(time.Duration(tokenExpirationTime) * time.Minute)
@@ -66,8 +66,8 @@ func CreateToken(username string, app *app.Application) (string, string, error) 
 	return tokenString, refreshTokenString, nil
 }
 
-func ValidateRefreshToken(refreshToken string, app *app.Application) (*Claims, error) {
-	log := app.LogApp
+func ValidateRefreshToken(refreshToken string) (*Claims, error) {
+	log := globals.GetAppLogger()
 	token, err := jwt.ParseWithClaims(refreshToken, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			log.Error("ValidateRefreshToken() | Unexpected signing method. %v", token.Header["alg"])
@@ -89,9 +89,9 @@ func ValidateRefreshToken(refreshToken string, app *app.Application) (*Claims, e
 	}
 }
 
-func IssueNewTokens(refreshToken string, claims jwt.MapClaims, app *app.Application) (string, string, error) {
+func IssueNewTokens(refreshToken string, claims jwt.MapClaims) (string, string, error) {
 
-	db := app.DB
+	db := globals.GetDBInstance()
 	username, ok := claims["username"].(string)
 	if !ok {
 		return "", "", errors.New("no username in the claims")
@@ -106,7 +106,7 @@ func IssueNewTokens(refreshToken string, claims jwt.MapClaims, app *app.Applicat
 		return "", "", errors.New("token has already been used")
 	}
 
-	accessToken, refreshToken, err := CreateToken(username, app)
+	accessToken, refreshToken, err := CreateToken(username)
 	if err != nil {
 		return "", "", fmt.Errorf("unable to issue new tokens: %w", err)
 	}

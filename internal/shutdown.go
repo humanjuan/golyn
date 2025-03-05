@@ -1,8 +1,8 @@
 package internal
 
 import (
+	"Back/globals"
 	"context"
-	"github.com/jpengineer/logger"
 	"net/http"
 	"os"
 	"os/signal"
@@ -10,14 +10,14 @@ import (
 	"time"
 )
 
-func CatchSignalDual(serverTLS, serverHTTP *http.Server, log *logger.Log) {
-	log.Info("catchSignalDual() | Managing graceful shutdown for both servers")
-	log.Info("Received shutdown signal. Shutting down servers...")
-
+func CatchSignalDual(serverTLS, serverHTTP *http.Server) {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	log := globals.GetAppLogger()
 
 	<-quit
+	log.Info("catchSignalDual() | Managing graceful shutdown for both servers")
+	log.Info("catchSignalDual() | Received shutdown signal. Shutting down servers...")
 
 	log.Info("Emmett HTTPS Brown: Good look for both of our sake")
 	log.Info("Emmett HTTPS Brown:: See you in the future")

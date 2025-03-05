@@ -1,14 +1,16 @@
 package middlewares
 
 import (
+	"Back/globals"
 	"Back/internal/utils"
+	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/jpengineer/logger"
 	"github.com/patrickmn/go-cache"
 	"net/http"
 )
 
-func CacheMiddleware(log *logger.Log, servCache *cache.Cache) gin.HandlerFunc {
+func CacheMiddleware(servCache *cache.Cache) gin.HandlerFunc {
+	log := globals.GetAppLogger()
 	log.Debug("cacheMiddleware()")
 	return func(c *gin.Context) {
 		c.Set("serverCache", servCache)
@@ -17,13 +19,14 @@ func CacheMiddleware(log *logger.Log, servCache *cache.Cache) gin.HandlerFunc {
 }
 
 func GetCache(c *gin.Context) *cache.Cache {
+	log := globals.GetAppLogger()
+	log.Debug("GetCache()")
 	serverCache, ok := c.MustGet("serverCache").(*cache.Cache)
-
 	if !ok {
-		c.IndentedJSON(http.StatusInternalServerError, gin.H{
-			"error":   utils.GetCodeMessage(http.StatusInternalServerError),
-			"message": "serverCache type mismatch",
-		})
+		log.Error("GetCache() | serverCache type mismatch")
+		err := fmt.Errorf("serverCache type mismatch")
+		c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
+		c.Abort()
 		return nil
 	}
 	return serverCache

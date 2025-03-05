@@ -12,28 +12,27 @@ type DBInstance struct {
 	db *pgxpool.Pool
 }
 
-func (dbi *DBInstance) InitDB(conf *loaders.Config, logDB *logger.Log) error {
+func (dbi *DBInstance) InitDB(config *loaders.Database, log *logger.Log) error {
 	var err error
-	logDB.Info("DB user: %s | DB name: %s | DB schema: %s | DB host: %s | DB port: %d",
-		conf.Database.Username, conf.Database.Database, conf.Database.Schema, conf.Database.Host, conf.Database.Port)
+	log.Info("DB user: %s | DB name: %s | DB schema: %s | DB host: %s | DB port: %d",
+		config.Username, config.Database, config.Schema, config.Host, config.Port)
 
-	dbData := conf.Database
 	dbString := fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s sslmode=disable search_path=%s",
-		dbData.Username, dbData.Password, dbData.Host, dbData.Port, dbData.Database, dbData.Schema) // SSL disabled to DEV
+		config.Username, config.Password, config.Host, config.Port, config.Database, config.Schema) // SSL disabled to DEV
 
-	logDB.Debug("Postgres connection string: %s", dbString)
+	log.Debug("Postgres connection string: %s", dbString)
 
 	// Create pool
 	dbi.db, err = pgxpool.New(context.Background(), dbString)
 
 	if err != nil {
-		logDB.Error("Unable to connect to database. %w", err.Error())
+		log.Error("Unable to connect to database. %w", err.Error())
 		return err
 	}
 
 	err = dbi.db.Ping(context.Background())
 	if err != nil {
-		logDB.Error("The Database it doesn't available. %w", err.Error())
+		log.Error("The Database it doesn't available. %w", err.Error())
 		return err
 	}
 
@@ -41,12 +40,12 @@ func (dbi *DBInstance) InitDB(conf *loaders.Config, logDB *logger.Log) error {
 	sqlStatement := "Select version()"
 	err = dbi.db.QueryRow(context.Background(), sqlStatement).Scan(&version)
 	if err != nil {
-		logDB.Error("An error occurred while trying to get the version from the database: %w", err.Error())
+		log.Error("An error occurred while trying to get the version from the database: %w", err.Error())
 		return err
 	}
 
-	logDB.Info("Open Connection Database")
-	logDB.Info(version)
+	log.Info("Open Connection Database")
+	log.Info(version)
 	return nil
 }
 

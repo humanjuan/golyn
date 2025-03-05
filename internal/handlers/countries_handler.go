@@ -1,33 +1,31 @@
 package handlers
 
 import (
-	"Back/app"
 	"Back/database"
+	"Back/globals"
 	"Back/internal/utils"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
 
-func GetCountries(app *app.Application) gin.HandlerFunc {
+func GetCountries() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		log := app.LogApp
-		logDB := app.LogDB
+		log := globals.GetAppLogger()
+		logDB := globals.GetDBLogger()
 
 		log.Debug("GetCountries()")
-		db := app.DB
+		db := globals.GetDBInstance()
 
 		var countries []database.Country
 		err := db.Select(database.Queries["get_countries"], &countries)
 		if err != nil {
 			logDB.Error("An error has occurred in the database. Try again later: %s", err)
-			c.IndentedJSON(http.StatusInternalServerError, gin.H{
-				"message": utils.GetCodeMessage(http.StatusInternalServerError),
-				"error":   "An error has occurred in the database. Try again later.",
-			})
+			err = fmt.Errorf("an error has occurred in the database. Try again later")
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
 		}
 
-		logDB.Debug("countries: %s", countries)
 		c.IndentedJSON(http.StatusOK, gin.H{
 			"message": utils.GetCodeMessage(http.StatusOK),
 			"data":    countries,

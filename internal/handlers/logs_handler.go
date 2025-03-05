@@ -1,9 +1,10 @@
 package handlers
 
 import (
-	"Back/app"
+	"Back/globals"
 	"Back/internal/utils"
 	"bufio"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"os"
@@ -13,9 +14,11 @@ import (
 	"time"
 )
 
-func GetLogs(app *app.Application) gin.HandlerFunc {
+func GetLogs() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		log := app.LogApp
+		log := globals.GetAppLogger()
+		log.Debug("GetLogs()")
+		config := globals.GetConfig()
 		var logFilePath string
 		var typeLog string
 		pageQuery := c.Query("page")
@@ -26,26 +29,24 @@ func GetLogs(app *app.Application) gin.HandlerFunc {
 
 		switch logTypeQuery {
 		case "db":
-			logFilePath = filepath.Join(app.Config.Log.Path, "/Golyn_DB.log")
+			logFilePath = filepath.Join(config.Log.Path, "/golyn_db.log")
 			typeLog = "db"
 		default:
-			logFilePath = filepath.Join(app.Config.Log.Path, "/Golyn_server.log")
+			logFilePath = filepath.Join(config.Log.Path, "/golyn_server.log")
 			typeLog = "server"
 		}
 
 		file, err := os.Open(logFilePath)
 		if err != nil {
-			log.Error("An error has occurred in the server when trying to open the log file. Try again later: %s", err.Error())
-			c.IndentedJSON(http.StatusInternalServerError, gin.H{
-				"message": utils.GetCodeMessage(http.StatusInternalServerError),
-				"error":   "Could not open log file",
-			})
+			log.Error("An error has occurred in the server when trying to open the log file. Try again later: %v", err.Error())
+			err = fmt.Errorf("an error has occurred in the server when trying to open the log file")
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
 		}
 		defer func(file *os.File) {
 			err := file.Close()
 			if err != nil {
-				log.Error("An error has occurred in the server when trying to close the log file. Try again later: %s", err.Error())
+				log.Error("An error has occurred in the server when trying to close the log file. Try again later: %v", err.Error())
 			}
 		}(file)
 
@@ -64,31 +65,30 @@ func GetLogs(app *app.Application) gin.HandlerFunc {
 			if strings.HasSuffix(logTimeQuery, "h") {
 				logTimeInt, err := strconv.Atoi(strings.TrimSuffix(logTimeQuery, "h"))
 				if err != nil {
-					log.Error("An error has occurred in the server when trying to parse the logTime parameter. Try again later: %s", err.Error())
-					c.IndentedJSON(http.StatusBadRequest, gin.H{
-						"message": utils.GetCodeMessage(http.StatusBadRequest),
-						"error":   "Invalid logTime format. For hours, use a positive number followed by 'h'",
-					})
+					log.Error("An error has occurred in the server when trying to parse the logTime parameter. "+
+						"Invalid logTime format. For hours, use a positive number followed by 'h'. %v", err.Error())
+
+					err = fmt.Errorf("an error has occurred in the server when trying to parse the logTime parameter. " +
+						"Invalid logTime format. For hours, use a positive number followed by 'h'")
+					c.Error(utils.NewHTTPError(http.StatusBadRequest, err.Error()))
 					return
 				}
 				customLogTime = time.Duration(logTimeInt) * time.Hour
 			} else if strings.HasSuffix(logTimeQuery, "m") {
 				logTimeInt, err := strconv.Atoi(strings.TrimSuffix(logTimeQuery, "m"))
 				if err != nil {
-					log.Error("An error has occurred in the server when trying to parse the logTime parameter. Try again later: %s", err.Error())
-					c.IndentedJSON(http.StatusBadRequest, gin.H{
-						"message": utils.GetCodeMessage(http.StatusBadRequest),
-						"error":   "Invalid logTime format. For minutes, use a positive number followed by 'm'",
-					})
+					log.Error("An error has occurred in the server when trying to parse the logTime parameter. "+
+						"Invalid logTime format. For minutes, use a positive number followed by 'm'. %v", err.Error())
+					err = fmt.Errorf("an error has occurred in the server when trying to parse the logTime parameter. " +
+						"Invalid logTime format. For minutes, use a positive number followed by 'm'")
+					c.Error(utils.NewHTTPError(http.StatusBadRequest, err.Error()))
 					return
 				}
 				customLogTime = time.Duration(logTimeInt) * time.Minute
 			} else {
 				log.Error("Invalid logTime format (%s). Use 'XXh' or 'XXm' for hour and minutes respectively", logTimeQuery)
-				c.IndentedJSON(http.StatusBadRequest, gin.H{
-					"message": utils.GetCodeMessage(http.StatusBadRequest),
-					"error":   "Invalid logTime format. Use 'XXh' or 'XXm' for hour and minutes respectively",
-				})
+				err = fmt.Errorf("invalid logTime format (%s). Use 'XXh' or 'XXm' for hour and minutes respectively", logTimeQuery)
+				c.Error(utils.NewHTTPError(http.StatusBadRequest, err.Error()))
 				return
 			}
 		}
@@ -105,11 +105,9 @@ func GetLogs(app *app.Application) gin.HandlerFunc {
 		}
 
 		if err := scanner.Err(); err != nil {
-			log.Error("An error has occurred in the server when trying to read the log file: %s", err.Error())
-			c.IndentedJSON(http.StatusInternalServerError, gin.H{
-				"message": utils.GetCodeMessage(http.StatusInternalServerError),
-				"error":   "Error reading logs",
-			})
+			log.Error("An error has occurred in the server when trying to read the log file: %v", err.Error())
+			err = fmt.Errorf("an error has occurred in the server when trying to read the log file")
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
 		}
 
@@ -121,21 +119,17 @@ func GetLogs(app *app.Application) gin.HandlerFunc {
 		if isPaginated {
 			page, err = strconv.Atoi(pageQuery)
 			if err != nil || page < 1 {
-				log.Error("An error has occurred in the server when trying to parse the page parameter: %s", err.Error())
-				c.IndentedJSON(http.StatusBadRequest, gin.H{
-					"message": utils.GetCodeMessage(http.StatusBadRequest),
-					"error":   "Invalid page parameter",
-				})
+				log.Error("An error has occurred in the server when trying to parse the page parameter: %v", err.Error())
+				err = fmt.Errorf("an error has occurred in the server when trying to parse the page parameter")
+				c.Error(utils.NewHTTPError(http.StatusBadRequest, err.Error()))
 				return
 			}
 
 			pageSize, err = strconv.Atoi(pageSizeQuery)
 			if err != nil || pageSize < 1 {
 				log.Error("An error has occurred in the server when trying to parse the pageSize parameter: %s", err.Error())
-				c.IndentedJSON(http.StatusBadRequest, gin.H{
-					"message": utils.GetCodeMessage(http.StatusBadRequest),
-					"error":   "Invalid pageSize parameter",
-				})
+				err = fmt.Errorf("an error has occurred in the server when trying to parse the pageSize parameter")
+				c.Error(utils.NewHTTPError(http.StatusBadRequest, err.Error()))
 				return
 			}
 		}
@@ -143,7 +137,7 @@ func GetLogs(app *app.Application) gin.HandlerFunc {
 		totalLines := len(fileLines)
 		totalPages := (totalLines + pageSize - 1) / pageSize
 
-		// Leer en orden inverso para la paginación correcta
+		// Reading in inverse order to pagination
 		offset := (page - 1) * pageSize
 		start := totalLines - offset - 1
 

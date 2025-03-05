@@ -1,14 +1,15 @@
 package middlewares
 
 import (
+	"Back/globals"
 	"Back/internal/utils"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/jpengineer/logger"
 	"time"
 )
 
-func LoggingMiddleware(log *logger.Log) gin.HandlerFunc {
+func LoggingMiddleware() gin.HandlerFunc {
+	log := globals.GetAppLogger()
 	log.Debug("LoggingMiddleware()")
 	if log == nil {
 		panic("[ERROR] LoggingMiddleware received a nil logger instance.")

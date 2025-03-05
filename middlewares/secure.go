@@ -1,16 +1,20 @@
 package middlewares
 
 import (
+	"Back/globals"
+	"Back/internal/utils"
+	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/jpengineer/logger"
 	"github.com/unrolled/secure"
 	"net/http"
+	"strings"
 )
 
-func SecureMiddleware(log *logger.Log, isDev bool) gin.HandlerFunc {
-	log.Debug("setupSecureMiddleware()")
+func SecureMiddleware(isDev bool) gin.HandlerFunc {
+	log := globals.GetAppLogger()
+	log.Debug("SecureMiddleware()")
 	security := secure.New(secure.Options{
-		SSLRedirect:          true,
+		SSLRedirect:          false,
 		SSLTemporaryRedirect: false,
 		SSLProxyHeaders:      map[string]string{"X-Forwarded-Proto": "https"},
 		STSSeconds:           31536000,
@@ -30,18 +34,44 @@ func SecureMiddleware(log *logger.Log, isDev bool) gin.HandlerFunc {
 	})
 
 	return func(c *gin.Context) {
-		log.Debug("Processing secure middleware")
+		hostParts := strings.Split(c.Request.Host, ":")
+		host := hostParts[0]
 
-		// Procesar encabezados de seguridad
-		err := security.Process(c.Writer, c.Request)
-		if err != nil {
-			log.Error("setupSecureMiddleware() | Processing security middleware | Error: %v", err.Error())
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "request forbidden"})
+		// Verify valid certificate
+		globals.CertMutex.RLock()
+		_, hasCert := globals.Certificates[host]
+		isInvalid := globals.InvalidCertificates[host]
+		globals.CertMutex.RUnlock()
+		log.Debug("SecureMiddleware() | Host: %s | HasCert: %t | IsInvalid: %t | TLS: %v | Path: %s", host, hasCert, isInvalid, c.Request.TLS != nil, c.Request.URL.Path)
+
+		if c.Request.TLS == nil && (isInvalid || !hasCert) {
+			log.Debug("SecureMiddleware() | Fallback to HTTP only for host %s | Path: %s", host, c.Request.URL.Path)
+			c.Next()
 			return
 		}
 
-		// Verificar si existen errores de seguridad
-		if status := c.Writer.Status(); status > 299 && status < 200 {
+		if c.Request.TLS == nil && hasCert && !isInvalid {
+			redirURL := fmt.Sprintf("https://%s%s", host, c.Request.URL.Path)
+			c.Redirect(http.StatusMovedPermanently, redirURL)
+			log.Debug("SecureMiddleware() | Redirecting to HTTPS for host %s | Path: %s", host, c.Request.URL.Path)
+			return
+		}
+
+		// HTTPS without valid certificate
+		if c.Request.TLS != nil && (isInvalid || !hasCert) {
+			err := fmt.Sprintf("no valid certificate found | Host: %s", host)
+			log.Error("secureMiddleware() | No valid certificate for HTTPS request | Host: %s | Path: %s | Error: %v", host, c.Request.URL.Path, err)
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err))
+			c.Abort()
+			return
+		}
+
+		// Security Headers
+		err := security.Process(c.Writer, c.Request)
+		if err != nil {
+			log.Error("secureMiddleware() | An internal server error occurred while processing security. | Error: %v", err.Error())
+			err = fmt.Errorf("an internal server error occurred while processing security")
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			c.Abort()
 			return
 		}

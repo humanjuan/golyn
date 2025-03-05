@@ -2,48 +2,43 @@ package handlers
 
 import (
 	"Back/app"
+	"Back/globals"
 	"Back/internal/utils"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/jpengineer/logger"
 	"net/http"
 	"os"
 	"runtime"
 	"syscall"
 )
 
-func Version(serverInfo *app.Info, log *logger.Log) gin.HandlerFunc {
+func Version(serverInfo *app.Info) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		log := globals.GetAppLogger()
 		tlsVersion := utils.GetTLSVersion(c.Request)
 		certPEM, err := os.ReadFile(serverInfo.CertificatePath)
 		if err != nil {
-			c.IndentedJSON(http.StatusInternalServerError, gin.H{
-				"message": utils.GetCodeMessage(http.StatusInternalServerError),
-				"error":   err.Error(),
-			})
-			log.Error(err.Error())
+			log.Error("version() | An error has occurred while trying to read the certificate | Path: %s | Error: %v", serverInfo.CertificatePath, err.Error())
+			err = fmt.Errorf("an error has occurred while trying to read the certificate")
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
 		}
 		// decode PEM block
 		block, _ := pem.Decode(certPEM)
 		if block == nil {
-			c.IndentedJSON(http.StatusInternalServerError, gin.H{
-				"message": utils.GetCodeMessage(http.StatusInternalServerError),
-				"data":    "Couldn't decode PEM certificate",
-			})
-			log.Error("Couldn't decode PEM certificate")
+			log.Error("version() | An error has occurred while trying to decode PEM certificate | Path: %s | Error: %v", serverInfo.CertificatePath, err.Error())
+			err = fmt.Errorf("an error has occurred while trying to decode PEM certificate")
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
 		}
 		// certificate parse
 		cert, err := x509.ParseCertificate(block.Bytes)
 		if err != nil {
-			c.IndentedJSON(http.StatusInternalServerError, gin.H{
-				"message": utils.GetCodeMessage(http.StatusInternalServerError),
-				"data":    err.Error(),
-			})
-			log.Error(err.Error())
+			log.Error("version() | An error has occurred while trying to parse the certificate bytes | Path: %s | Error: %v", serverInfo.CertificatePath, err.Error())
+			err = fmt.Errorf("an error has occurred while trying to parse the certificate bytes")
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
 		}
 

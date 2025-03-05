@@ -2,24 +2,25 @@ package virtualhosts
 
 import (
 	"Back/app"
-	"Back/config/loaders"
+	"Back/globals"
 	"Back/routes"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/jpengineer/logger"
 	"os"
 	"path/filepath"
 )
 
-func Setup(router *gin.Engine, config *loaders.Config, log *logger.Log) (map[string]app.VirtualHost, string) {
+func Setup(router *gin.Engine) (map[string]app.VirtualHost, string) {
+	log := globals.GetAppLogger()
 	log.Debug("Setup() | Configured virtual hosts")
+	config := globals.GetConfig()
 	var defaultSitePath string
 	virtualHosts := make(map[string]app.VirtualHost)
 	processedDirectories := make(map[string]*gin.RouterGroup)
 
 	for _, siteConfig := range config.Sites {
 		if !siteConfig.Enabled {
-			log.Warn("Site '%s' is disabled. Skipping...", siteConfig.Directory)
+			log.Warn("Setup() | Site '%s' is disabled. | Skipping...", siteConfig.Directory)
 			continue
 		}
 
@@ -27,22 +28,22 @@ func Setup(router *gin.Engine, config *loaders.Config, log *logger.Log) (map[str
 		basePath := filepath.Join(config.Server.SitesRootPath, siteConfig.Directory)
 
 		if _, err := os.Stat(basePath); os.IsNotExist(err) {
-			log.Error("Site directory does not exist: %s", basePath)
+			log.Error("Setup() | Site directory does not exist | Path: %s", basePath)
 			continue
 		}
 
 		siteGroup := router.Group(fmt.Sprintf("/%s", siteConfig.Directory))
 		{
 			// Secure static file routes
-			siteGroup.GET("/style/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Style, "style", log))
-			siteGroup.GET("/js/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Js, "js", log))
-			siteGroup.GET("/assets/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Assets, "assets", log))
+			siteGroup.GET("/style/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Style, "style"))
+			siteGroup.GET("/js/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Js, "js"))
+			siteGroup.GET("/assets/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Assets, "assets"))
 
 			// Serve the index file
-			siteGroup.GET("/", routes.CreateStaticFileHandler(filepath.Join(basePath, "index.html"), log))
+			siteGroup.GET("/", routes.CreateStaticFileHandler(filepath.Join(basePath, "index.html")))
 
 			// Serve favicon
-			siteGroup.GET("/favicon.ico", routes.CreateStaticFileHandler(filepath.Join(siteConfig.StaticFiles.Assets, "favicon.ico"), log))
+			siteGroup.GET("/favicon.ico", routes.CreateStaticFileHandler(filepath.Join(siteConfig.StaticFiles.Assets, "favicon.ico")))
 		}
 
 		// Asocia cada dominio con el `VirtualHost`
@@ -52,12 +53,12 @@ func Setup(router *gin.Engine, config *loaders.Config, log *logger.Log) (map[str
 				BasePath:  basePath,
 				SiteGroup: processedDirectories[siteConfig.Directory],
 			}
-			log.Info("Configured virtual host '%s' for site directory: %s", domain, basePath)
+			log.Info("Setup() | Configured virtual host '%s' for site directory: %s", domain, basePath)
 		}
 	}
 
 	defaultSitePath = "./sites/golyn"
 
-	log.Info("Default Site Path: %s", defaultSitePath)
+	log.Info("Setup() | Default Site Path: %s", defaultSitePath)
 	return virtualHosts, defaultSitePath
 }

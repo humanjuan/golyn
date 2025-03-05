@@ -16,6 +16,7 @@ const (
 	Forbidden           = 403
 	NotFound            = 404
 	MethodNotAllowed    = 405
+	MisdirectedRequest  = 421
 	InternalServerError = 500
 	NotImplemented      = 501
 	BadGateway          = 502
@@ -38,6 +39,7 @@ var httpCodeMessages = map[int]string{
 	Forbidden:           "[Forbidden] The server understood the request but refuses to authorize it.",
 	NotFound:            "[Not Found] The requested resource is not found in the server.",
 	MethodNotAllowed:    "[Method Not Allowed] The requested HTTP method it doesn't allow for this route.",
+	MisdirectedRequest:  "[Misdirected Request] The request was directed at a server that is not able to produce a response.",
 	InternalServerError: "[Internal Server Error] Indicates an internal error in the server.",
 	NotImplemented:      "[Not Implemented] The server can't achieve the request because it doesn't recognize the action.",
 	BadGateway:          "[Bad Gateway] The server, as long as acted like a gateway or proxy, received an invalid respond from the upstream server.",

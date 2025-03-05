@@ -25,8 +25,8 @@ Helpers for common tasks:
 ### **`shutdown.go`**
 Manages graceful shutdown for HTTP and HTTPS servers upon signals like `SIGINT` or `SIGTERM`.
 
-### **`tls.go`**
-TLS configuration:
+### **`server.go`**
+
 - Sets up the HTTPS server with certificates.
 - Configures HTTP to HTTPS redirection.
 

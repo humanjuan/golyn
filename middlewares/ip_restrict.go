@@ -1,6 +1,9 @@
 package middlewares
 
 import (
+	"Back/globals"
+	"Back/internal/utils"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strings"
@@ -10,13 +13,19 @@ import (
 
 func RestrictAPIRequestMiddleware(allowHost string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		log := globals.GetAppLogger()
+		log.Debug("RestrictAPIRequestMiddleware()")
 		hostParts := strings.Split(c.Request.Host, ":")
 		host := hostParts[0]
 
 		// PRODUCTION
 		if !strings.HasSuffix(host, allowHost) {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Access denied"})
+			err := fmt.Errorf("access denied for host %s", host)
+			c.Error(utils.NewHTTPError(http.StatusForbidden, err.Error()))
+			c.Abort()
+			log.Warn("RestrictAPIRequestMiddleware() | Access denied | Host: %s | URL: %s", host, c.Request.URL)
 			return
 		}
+		c.Next()
 	}
 }

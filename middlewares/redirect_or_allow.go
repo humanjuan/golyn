@@ -1,17 +1,21 @@
 package middlewares
 
 import (
-	"Back/app"
+	"Back/globals"
+	"Back/internal/utils"
+	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/jpengineer/logger"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
-func RedirectOrAllowHostMiddleware(log *logger.Log, virtualHosts map[string]app.VirtualHost) gin.HandlerFunc {
+func RedirectOrAllowHostMiddleware() gin.HandlerFunc {
+	log := globals.GetAppLogger()
 	log.Debug("redirectOrAllowHostMiddleware() initialized")
+	virtualHosts := globals.VirtualHosts
+
 	return func(c *gin.Context) {
 		hostName := c.Request.Host
 		hostParts := strings.Split(hostName, ":")
@@ -39,7 +43,9 @@ func RedirectOrAllowHostMiddleware(log *logger.Log, virtualHosts map[string]app.
 			if !strings.HasPrefix(requestedFile, sitePath) {
 				log.Error("redirectOrAllowHostMiddleware() | Path Traversal Attempt | Host: %s | Path: %s | ResolvedPath: %s",
 					hostName, c.Request.URL.Path, requestedFile)
-				c.AbortWithStatus(http.StatusForbidden)
+				err := fmt.Errorf("access to the requested resources is restricted")
+				c.Error(utils.NewHTTPError(http.StatusForbidden, err.Error()))
+				c.Abort()
 				return
 			}
 
@@ -67,12 +73,13 @@ func RedirectOrAllowHostMiddleware(log *logger.Log, virtualHosts map[string]app.
 				c.Abort()
 				return
 			} else {
-				log.Error("redirectOrAllowHostMiddleware() | File Not Found or Inaccessible | Host: %s | RequestedFile: %s | Error: %v", hostName, requestedFile, err.Error())
+				log.Warn("redirectOrAllowHostMiddleware() | File Not Found or Inaccessible | Host: %s | RequestedFile: %s | Error: %v", hostName, requestedFile, err.Error())
 			}
 		}
 
 		log.Warn("redirectOrAllowHostMiddleware() | Host Not Configured | Host: %s | Path: %s", hostName, c.Request.URL.Path)
-		c.AbortWithStatus(http.StatusForbidden)
-		return
+		err := fmt.Errorf("the requested route does not exist: %s", c.Request.URL.Path)
+		c.Error(utils.NewHTTPError(http.StatusNotFound, err.Error()))
+		c.Abort()
 	}
 }

@@ -1,29 +1,27 @@
 package utils
 
 import (
-	"github.com/jpengineer/logger"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 )
 
-func GetIPAddresses(log *logger.Log) (string, string) {
-	log.Debug("getIPAddresses()")
+func GetIPAddresses() (string, string, error) {
 	resp, err := http.Get("https://ifconfig.me/ip")
 	if err != nil {
-		log.Error("Error obtaining public IP: %v", err)
-		return "", ""
+		return "", "", err
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			log.Error("Error closing public IP response: %v", err)
+			fmt.Printf("[ERROR] Error closing public IP response: %v\n", err)
 		}
 	}(resp.Body)
 
 	publicIPBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Error("Error reading public IP response: %v", err)
+		fmt.Printf("[ERROR] Error reading public IP response: %v\n", err)
 	}
 	publicIP := string(publicIPBytes)
 
@@ -31,8 +29,7 @@ func GetIPAddresses(log *logger.Log) (string, string) {
 	var localIP string
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		log.Error("Error obtaining local IP addresses: %v", err)
-		return publicIP, ""
+		return publicIP, "", err
 	}
 
 	for _, addr := range addrs {
@@ -44,5 +41,5 @@ func GetIPAddresses(log *logger.Log) (string, string) {
 		}
 	}
 
-	return publicIP, localIP
+	return publicIP, localIP, nil
 }

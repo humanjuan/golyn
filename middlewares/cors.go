@@ -2,13 +2,15 @@ package middlewares
 
 import (
 	"Back/config/loaders"
+	"Back/globals"
 	"github.com/gin-gonic/gin"
 	"github.com/jpengineer/logger"
 	"net/http"
 	"net/url"
 )
 
-func CorsMiddleware(sites []loaders.SiteConfig, log *logger.Log) gin.HandlerFunc {
+func CorsMiddleware(sites []loaders.SiteConfig) gin.HandlerFunc {
+	log := globals.GetAppLogger()
 	allowedOrigins := getAllowedOrigins(sites, log)
 	originMap := make(map[string]struct{}, len(allowedOrigins))
 	for _, origin := range allowedOrigins {

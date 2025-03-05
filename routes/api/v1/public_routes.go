@@ -7,9 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterPublicRoutes(router *gin.RouterGroup, app *app.Application, serverInfo *app.Info) {
-	router.GET("/version", handlers.Version(serverInfo, app.LogApp))
+func RegisterPublicRoutes(router *gin.RouterGroup, serverInfo *app.Info) {
+	router.GET("/version", handlers.Version(serverInfo))
 	router.GET("/ping", handlers.Ping)
-	router.POST("/login", auth.Login(app))
-	router.POST("/refresh_token", auth.RefreshToken(app))
+	router.POST("/login", auth.Login())
+	router.POST("/refresh_token", auth.RefreshToken())
 }
