@@ -18,6 +18,7 @@ mkdir "$buildPath"/"$releaseNameNoVersion"/config
 mkdir "$buildPath"/"$releaseNameNoVersion"/config/server
 mkdir "$buildPath"/"$releaseNameNoVersion"/config/sites
 mkdir "$buildPath"/"$releaseNameNoVersion"/certificates
+mkdir "$buildPath"/"$releaseNameNoVersion"/certificates/golyn
 mkdir "$buildPath"/"$releaseNameNoVersion"/sites
 
 

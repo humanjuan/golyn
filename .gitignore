@@ -27,6 +27,10 @@ go.work.sum
 # certificates
 *.pem
 
+# build
+*.gz
+builds/Golyn
+
 /var/log/golyn_db.log
 /var/log/golyn_server.log
 /sites/kayak/
