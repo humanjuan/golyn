@@ -34,8 +34,10 @@ builds/Golyn
 /var/log/golyn_db.log
 /var/log/golyn_server.log
 /sites/kayak/
+/sites/portfolio/
 /sites/portal.golyn/
 /pkg/mod/
 /pkg/sumdb/
 .idea/
 .DS_Store
+/certificates/portfolio/

@@ -148,6 +148,7 @@ func main() {
 
 	// APPLY MIDDLEWARE
 	serverRouter.Use(middlewares.CustomErrorHandler())
+	serverRouter.Use(middlewares.ClientCacheMiddleware(conf.Server.Dev))
 	serverRouter.Use(middlewares.LoggingMiddleware())
 	serverRouter.Use(middlewares.SecureMiddleware(conf.Server.Dev))
 	serverRouter.Use(middlewares.RedirectOrAllowHostMiddleware())
