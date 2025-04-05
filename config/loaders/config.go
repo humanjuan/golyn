@@ -32,6 +32,8 @@ type SiteConfig struct {
 	Path        string
 	Directory   string
 	Domains     []string
+	Proxy       bool
+	ProxyTarget string
 	StaticFiles StaticFiles
 	Security    Security
 }
@@ -146,7 +148,7 @@ func LoadConfig() (*Config, error) {
 		wg.Add(1)
 		go func(name, path string) {
 			defer wg.Done()
-			defer func() { <-sem }() // Libera el token
+			defer func() { <-sem }() // token free
 			site, err := loadSiteConfig(name, path, basePath, server)
 			if err != nil {
 				return
@@ -225,6 +227,8 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 
 	siteConfig.Directory = siteSettings.Key("directory").String()
 	siteConfig.Domains = siteSettings.Key("domains").Strings(",")
+	siteConfig.Proxy, _ = siteSettings.Key("proxy").Bool()
+	siteConfig.ProxyTarget = siteSettings.Key("proxy_target").String()
 
 	// STATIC FILES
 	staticFiles.Assets = siteSettings.Key("static_files_path").String()

@@ -2,7 +2,6 @@ package v1
 
 import (
 	"Back/internal/handlers"
-
 	"github.com/gin-gonic/gin"
 )
 

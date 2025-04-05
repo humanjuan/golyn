@@ -221,30 +221,6 @@ func main() {
 		}
 	}()
 
-	/*// START HTTPS SERVER
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		logApp.Debug("main() | Starting HTTPS server on %s (%v mode)", serverHTTPS.Addr, mode)
-		err = serverHTTPS.ListenAndServeTLS("", "")
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logApp.Error("main() | An error has occurred while trying to start the HTTPS server. | Error: %v", err.Error())
-			os.Exit(1)
-		}
-	}()
-
-	// START HTTP SERVEER
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		logApp.Debug("main() | Starting HTTP server for redirect on %s", serverHTTP.Addr)
-		err = serverHTTP.ListenAndServe()
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logApp.Error("main() | An error has occurred while trying to start the HTTP server. | Error: %v", err.Error())
-			os.Exit(1)
-		}
-	}()*/
-
 	// SHUTDOWN HANDLER
 	wg.Add(1)
 	go func() {
