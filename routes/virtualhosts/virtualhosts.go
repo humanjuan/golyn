@@ -2,6 +2,7 @@ package virtualhosts
 
 import (
 	"Back/app"
+	"Back/config/loaders"
 	"Back/globals"
 	"Back/middlewares"
 	"Back/routes"
@@ -11,12 +12,10 @@ import (
 	"path/filepath"
 )
 
-func Setup(router *gin.Engine) (map[string]app.VirtualHost, string) {
+func Setup(router *gin.Engine) map[string]app.VirtualHost {
 	log := globals.GetAppLogger()
 	log.Debug("Setup() | Configured virtual hosts")
 	config := globals.GetConfig()
-	var defaultSitePath string
-	var siteGroup *gin.RouterGroup
 	virtualHosts := make(map[string]app.VirtualHost)
 	// processedDirectories := make(map[string]*gin.RouterGroup)
 
@@ -28,9 +27,7 @@ func Setup(router *gin.Engine) (map[string]app.VirtualHost, string) {
 
 		// if proxy = true, apply reverse proxy
 		if siteConfig.Proxy {
-			siteGroup = router.Group(fmt.Sprintf("%s", siteConfig.Directory))
-			siteGroup.Use(middlewares.ReverseProxyMiddleware(siteConfig.ProxyTarget))
-			log.Info("Setup() | Configured proxy for site '%s' | Proxy Target: %s", siteConfig.Directory, siteConfig.ProxyTarget)
+			log.Info("Setup() | Site '%s' is configured as reverse proxy for: %v", siteConfig.Directory, siteConfig.Domains)
 			continue
 		}
 
@@ -68,8 +65,44 @@ func Setup(router *gin.Engine) (map[string]app.VirtualHost, string) {
 		}
 	}
 
-	defaultSitePath = "./sites/golyn"
+	globals.DefaultSite = "./sites/golyn"
 
-	log.Info("Setup() | Default Site Path: %s", defaultSitePath)
-	return virtualHosts, defaultSitePath
+	log.Info("Setup() | Default Site Path: %s", globals.DefaultSite)
+	return virtualHosts
+}
+
+func BuildProxyHostMap(sites []loaders.SiteConfig) map[string]string {
+	log := globals.GetAppLogger()
+	log.Debug("BuildProxyHostMap()")
+	proxyMap := make(map[string]string)
+
+	for _, site := range sites {
+		if site.Proxy {
+			for _, domain := range site.Domains {
+				proxyMap[domain] = site.ProxyTarget
+			}
+		}
+	}
+
+	return proxyMap
+}
+
+func CreateDynamicProxyHandler(proxyMap map[string]string) gin.HandlerFunc {
+	log := globals.GetAppLogger()
+	log.Debug("CreateDynamicProxyHandler()")
+	return func(c *gin.Context) {
+		host := c.Request.Host
+		target, exists := proxyMap[host]
+		log.Debug("CreateDynamicProxyHandler() | ProxyCheck | Host: %s | Path: %s | Exists: %v | Target: %s", host, c.Request.URL.Path, exists, target)
+
+		if exists {
+			log.Info("CreateDynamicProxyHandler() | Applying reverse proxy to %s", target)
+			middleware := middlewares.ReverseProxyMiddleware(target)
+			middleware(c)
+			return
+		}
+
+		log.Warn("CreateDynamicProxyHandler() | Host not found in proxyMap: %s", host)
+		c.Next()
+	}
 }

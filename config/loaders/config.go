@@ -231,33 +231,37 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 	siteConfig.ProxyTarget = siteSettings.Key("proxy_target").String()
 
 	// STATIC FILES
-	staticFiles.Assets = siteSettings.Key("static_files_path").String()
-	if !filepath.IsAbs(staticFiles.Assets) {
-		staticFiles.Assets = filepath.Join(basePath, staticFiles.Assets)
-	}
-	if !utils.FileOrDirectoryExists(staticFiles.Assets) {
-		fmt.Printf("[ERROR] The static file directory '%s' does not exist\n", staticFiles.Assets)
-		return siteConfig, fmt.Errorf("the static file directory '%s' does not exist", staticFiles.Assets)
-	}
+	if siteConfig.Proxy {
+		fmt.Printf("[INFO] Skipping static files for site '%s' because it is a proxy\n", name)
+	} else {
+		staticFiles.Assets = siteSettings.Key("static_files_path").String()
+		if !filepath.IsAbs(staticFiles.Assets) {
+			staticFiles.Assets = filepath.Join(basePath, staticFiles.Assets)
+		}
+		if !utils.FileOrDirectoryExists(staticFiles.Assets) {
+			fmt.Printf("[ERROR] The static file directory '%s' does not exist\n", staticFiles.Assets)
+			return siteConfig, fmt.Errorf("the static file directory '%s' does not exist", staticFiles.Assets)
+		}
 
-	staticFiles.Js = siteSettings.Key("js_path").String()
-	if !filepath.IsAbs(staticFiles.Js) {
-		staticFiles.Js = filepath.Join(basePath, staticFiles.Js)
-	}
-	if !utils.FileOrDirectoryExists(staticFiles.Js) {
-		fmt.Printf("[ERROR] The static file directory '%s' does not exist\n", staticFiles.Js)
-		return siteConfig, fmt.Errorf("the static file directory '%s' does not exist", staticFiles.Js)
-	}
+		staticFiles.Js = siteSettings.Key("js_path").String()
+		if !filepath.IsAbs(staticFiles.Js) {
+			staticFiles.Js = filepath.Join(basePath, staticFiles.Js)
+		}
+		if !utils.FileOrDirectoryExists(staticFiles.Js) {
+			fmt.Printf("[ERROR] The static file directory '%s' does not exist\n", staticFiles.Js)
+			return siteConfig, fmt.Errorf("the static file directory '%s' does not exist", staticFiles.Js)
+		}
 
-	staticFiles.Style = siteSettings.Key("style_path").String()
-	if !filepath.IsAbs(staticFiles.Style) {
-		staticFiles.Style = filepath.Join(basePath, staticFiles.Style)
+		staticFiles.Style = siteSettings.Key("style_path").String()
+		if !filepath.IsAbs(staticFiles.Style) {
+			staticFiles.Style = filepath.Join(basePath, staticFiles.Style)
+		}
+		if !utils.FileOrDirectoryExists(staticFiles.Style) {
+			fmt.Printf("[ERROR] The static file directory '%s' does not exist\n", staticFiles.Style)
+			return siteConfig, fmt.Errorf("the static file directory '%s' does not exist", staticFiles.Style)
+		}
+		siteConfig.StaticFiles = staticFiles
 	}
-	if !utils.FileOrDirectoryExists(staticFiles.Style) {
-		fmt.Printf("[ERROR] The static file directory '%s' does not exist\n", staticFiles.Style)
-		return siteConfig, fmt.Errorf("the static file directory '%s' does not exist", staticFiles.Style)
-	}
-	siteConfig.StaticFiles = staticFiles
 
 	// SSL/TLS
 	tls_ssl.Cert = siteSettings.Key("cert_path").String()

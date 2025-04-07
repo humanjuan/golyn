@@ -22,6 +22,7 @@ func LoadErrorTemplate(templateDir string) error {
 
 	var parseErr error
 	globals.ErrorTemplate, parseErr = template.ParseGlob(fullPath)
+
 	if parseErr != nil {
 		log.Error("LoadErrorTemplate() | Failed to parse template | Path: %s | Error: %v", fullPath, parseErr.Error())
 		return parseErr

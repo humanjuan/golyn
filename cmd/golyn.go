@@ -74,8 +74,6 @@ func main() {
 		logApp.Error("main() | An error has occurred while loading certificates. | Error: %v", err.Error())
 	}
 
-	fmt.Println("Invalid Certificates: ", globals.InvalidCertificates)
-
 	logApp.Debug("main() | globals.InvalidCertificates: %v", globals.InvalidCertificates)
 
 	// GET PUBLIC IP
@@ -138,7 +136,8 @@ func main() {
 	serverRouter := gin.Default()
 
 	// VIRTUAL HOSTS
-	globals.VirtualHosts, globals.DefaultSite = virtualhosts.Setup(serverRouter)
+	globals.VirtualHosts = virtualhosts.Setup(serverRouter)
+	proxyMap := virtualhosts.BuildProxyHostMap(conf.Sites)
 
 	// LOAD ERROR TEMPLATE
 	err = handlers.LoadErrorTemplate(globals.DefaultSite)
@@ -148,11 +147,12 @@ func main() {
 
 	// APPLY MIDDLEWARE
 	serverRouter.Use(middlewares.CustomErrorHandler())
-	serverRouter.Use(middlewares.ClientCacheMiddleware(conf.Server.Dev))
+	serverRouter.Use(virtualhosts.CreateDynamicProxyHandler(proxyMap))
 	serverRouter.Use(middlewares.LoggingMiddleware())
 	serverRouter.Use(middlewares.SecureMiddleware(conf.Server.Dev))
 	serverRouter.Use(middlewares.RedirectOrAllowHostMiddleware())
 	serverRouter.Use(middlewares.CorsMiddleware(conf.Sites))
+	serverRouter.Use(middlewares.ClientCacheMiddleware(conf.Server.Dev))
 
 	// CREATE SERVER CACHE AND APPLY MORE MIDDLEWARE
 	serverRouter.Use(middlewares.CacheMiddleware(
