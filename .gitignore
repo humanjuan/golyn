@@ -30,6 +30,8 @@ go.work.sum
 # build
 *.gz
 builds/Golyn
+builds/golyn
+builds/*.gz
 
 /var/log/golyn_db.log
 /var/log/golyn_server.log
@@ -41,3 +43,5 @@ builds/Golyn
 .idea/
 .DS_Store
 /certificates/portfolio/
+/docker/taiga/
+/builds/Golyn/
