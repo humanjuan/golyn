@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-ini/ini"
+	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"sync"
 )
 
@@ -36,6 +38,7 @@ type SiteConfig struct {
 	ProxyTarget string
 	StaticFiles StaticFiles
 	Security    Security
+	Mail        SMTP
 }
 
 type Database struct {
@@ -71,6 +74,13 @@ type Log struct {
 	Path      string
 	MaxSizeMb int
 	MaxBackup int
+}
+
+type SMTP struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
 }
 
 type Config struct {
@@ -198,6 +208,9 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 	var staticFiles StaticFiles
 	var tls_ssl TLS_SSL
 	var security Security
+	var mail SMTP
+	var ok bool
+	var err error
 
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(basePath, path)
@@ -214,27 +227,54 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 		return siteConfig, fmt.Errorf("error loading the site configuration '%s': %v", name, err)
 	}
 
-	siteSettings := siteConfigFile.Section("settings")
+	sectionName := "settings"
+	siteSettings := siteConfigFile.Section(sectionName)
 
 	// SITE CONFIG
 	siteConfig.Path = path
-	siteConfig.Enabled, _ = siteSettings.Key("enabled").Bool()
+	siteConfig.Enabled, ok, err = CheckBool(siteSettings.Key("enabled"), true, sectionName, "enabled")
+	if !ok {
+		fmt.Printf("[ERROR] Error loading the site configuration '%s': %v\n", name, err)
+		siteConfig.Enabled = false
+	}
 
 	if !siteConfig.Enabled {
 		fmt.Printf("[INFO] Skipping site '%s' because it is disabled\n", name)
 		return siteConfig, nil
 	}
 
-	siteConfig.Directory = siteSettings.Key("directory").String()
-	siteConfig.Domains = siteSettings.Key("domains").Strings(",")
-	siteConfig.Proxy, _ = siteSettings.Key("proxy").Bool()
-	siteConfig.ProxyTarget = siteSettings.Key("proxy_target").String()
+	siteConfig.Directory, ok, err = CheckString(siteSettings.Key("directory"), true, sectionName, "directory")
+	if !ok {
+		siteConfig.Enabled = false
+		fmt.Printf("[ERROR] The site %s was deactivated due to incorrect configuration.\n", name)
+		return siteConfig, fmt.Errorf("error loading the site configuration '%s': %v", name, err)
+	}
 
-	// STATIC FILES
+	siteConfig.Domains = siteSettings.Key("domains").Strings(",")
+	siteConfig.Proxy, ok, err = CheckBool(siteSettings.Key("proxy"), true, sectionName, "proxy")
+	if !ok {
+		fmt.Printf("[WARN] A problem has been detected in the proxy configuration. The 'proxy' "+
+			"setting has been set to 'false' as the default value for the site %s.\n", name)
+		siteConfig.Proxy = false
+		siteConfig.ProxyTarget = ""
+	}
+
 	if siteConfig.Proxy {
+		siteConfig.ProxyTarget, ok, err = CheckString(siteSettings.Key("proxy_target"), true, sectionName, "proxy_target")
+		if !ok {
+			siteConfig.Enabled = false
+			fmt.Printf("[ERROR] The site %s was deactivated due to incorrect configuration with proxy. Proxy target is empty\n", name)
+			return siteConfig, fmt.Errorf("error loading the site configuration '%s': %v", name, err)
+		}
 		fmt.Printf("[INFO] Skipping static files for site '%s' because it is a proxy\n", name)
 	} else {
-		staticFiles.Assets = siteSettings.Key("static_files_path").String()
+		// STATIC FILES
+		staticFiles.Assets, ok, err = CheckString(siteSettings.Key("static_files_path"), true, sectionName, "static_files_path")
+		if !ok {
+			siteConfig.Enabled = false
+			fmt.Printf("[ERROR] The site %s was deactivated due to incorrect configuration with static files. Static files path is empty\n", name)
+			return siteConfig, fmt.Errorf("error loading the site configuration '%s': %v", name, err)
+		}
 		if !filepath.IsAbs(staticFiles.Assets) {
 			staticFiles.Assets = filepath.Join(basePath, staticFiles.Assets)
 		}
@@ -243,7 +283,12 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 			return siteConfig, fmt.Errorf("the static file directory '%s' does not exist", staticFiles.Assets)
 		}
 
-		staticFiles.Js = siteSettings.Key("js_path").String()
+		staticFiles.Js, ok, err = CheckString(siteSettings.Key("js_path"), true, sectionName, "js_path")
+		if !ok {
+			siteConfig.Enabled = false
+			fmt.Printf("[ERROR] The site %s was deactivated due to incorrect configuration with static files. JS path is empty\n", name)
+			return siteConfig, fmt.Errorf("error loading the site configuration '%s': %v", name, err)
+		}
 		if !filepath.IsAbs(staticFiles.Js) {
 			staticFiles.Js = filepath.Join(basePath, staticFiles.Js)
 		}
@@ -252,7 +297,12 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 			return siteConfig, fmt.Errorf("the static file directory '%s' does not exist", staticFiles.Js)
 		}
 
-		staticFiles.Style = siteSettings.Key("style_path").String()
+		staticFiles.Style, ok, err = CheckString(siteSettings.Key("style_path"), true, sectionName, "style_path")
+		if !ok {
+			siteConfig.Enabled = false
+			fmt.Printf("[ERROR] The site %s was deactivated due to incorrect configuration with static files. Style path is empty\n", name)
+			return siteConfig, fmt.Errorf("error loading the site configuration '%s': %v", name, err)
+		}
 		if !filepath.IsAbs(staticFiles.Style) {
 			staticFiles.Style = filepath.Join(basePath, staticFiles.Style)
 		}
@@ -264,9 +314,9 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 	}
 
 	// SSL/TLS
-	tls_ssl.Cert = siteSettings.Key("cert_path").String()
-	tls_ssl.Key = siteSettings.Key("key_path").String()
-	tls_ssl.Chain = siteSettings.Key("chain_path").String()
+	tls_ssl.Cert, _, _ = CheckString(siteSettings.Key("cert_path"), false, sectionName, "cert_path")
+	tls_ssl.Key, _, _ = CheckString(siteSettings.Key("key_path"), false, sectionName, "key_path")
+	tls_ssl.Chain, _, _ = CheckString(siteSettings.Key("chain_path"), false, sectionName, "chain_path")
 	security.TLS_SSL = tls_ssl
 
 	// SECURITY
@@ -274,5 +324,67 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 	security.HTTPSRedirect, _ = siteSettings.Key("enable_https_redirect").Bool()
 	siteConfig.Security = security
 
+	// SMTP
+	mail.Host, _, _ = CheckString(siteSettings.Key("smtp_host"), false, sectionName, "smtp_host")
+	mail.Port, _, _ = CheckInt(siteSettings.Key("smtp_port"), false, sectionName, "smtp_port")
+	mail.Username, _, _ = CheckString(siteSettings.Key("smtp_user"), false, sectionName, "smtp_user")
+	mail.Password = os.ExpandEnv(siteSettings.Key("smtp_password").String())
+	siteConfig.Mail = mail
 	return siteConfig, nil
+}
+
+func CheckString(key *ini.Key, required bool, sectionName, fieldName string) (string, bool, error) {
+	if key == nil {
+		if required {
+			return "", false, fmt.Errorf("missing required '%s' in [%s] section", fieldName, sectionName)
+		}
+		return "", true, nil
+	}
+	value := key.String()
+	if required && value == "" {
+		return "", false, fmt.Errorf("required '%s' in [%s] section is empty", fieldName, sectionName)
+	}
+	return value, true, nil
+}
+
+func CheckInt(key *ini.Key, required bool, sectionName, fieldName string) (int, bool, error) {
+	if key == nil {
+		if required {
+			return 0, false, fmt.Errorf("missing required '%s' in [%s] section", fieldName, sectionName)
+		}
+		return 0, true, nil
+	}
+	valueStr := key.String()
+	if required && valueStr == "" {
+		return 0, false, fmt.Errorf("required '%s' in [%s] section is empty", fieldName, sectionName)
+	}
+	if valueStr == "" {
+		return 0, true, nil
+	}
+	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		return 0, false, fmt.Errorf("invalid '%s' in [%s] section: %v", fieldName, sectionName, err)
+	}
+	return value, true, nil
+}
+
+func CheckBool(key *ini.Key, required bool, sectionName, fieldName string) (bool, bool, error) {
+	if key == nil {
+		if required {
+			return false, false, fmt.Errorf("missing required '%s' in [%s] section", fieldName, sectionName)
+		}
+		return false, true, nil
+	}
+	valueStr := key.String()
+	if required && valueStr == "" {
+		return false, false, fmt.Errorf("required '%s' in [%s] section is empty", fieldName, sectionName)
+	}
+	if valueStr == "" {
+		return false, true, nil
+	}
+	value, err := strconv.ParseBool(valueStr)
+	if err != nil {
+		return false, false, fmt.Errorf("invalid '%s' in [%s] section: %v", fieldName, sectionName, err)
+	}
+	return value, true, nil
 }
