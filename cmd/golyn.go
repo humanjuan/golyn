@@ -6,6 +6,7 @@ import (
 	"Back/database"
 	"Back/globals"
 	"Back/internal"
+	"Back/internal/cli"
 	"Back/internal/handlers"
 	"Back/internal/utils"
 	"Back/middlewares"
@@ -26,11 +27,21 @@ import (
 // Documentation: https://gin-gonic.com/docs/quickstart/
 
 const (
-	version    string = "v1.0.0-05032025A"
-	mainDomain string = "golyn.local"
+	version    string = "v1.0.0-12042025A"
+	mainDomain string = "humanjuan.com"
 )
 
 func main() {
+	// RUN CLI COMMAND BASED ON FLAGS
+	exitCode, err, useFlag := cli.RunCLI()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(exitCode)
+	}
+	if useFlag {
+		os.Exit(exitCode)
+	}
+
 	// LOAD CONFIG
 	conf, err := loaders.LoadConfig()
 	if err != nil {
