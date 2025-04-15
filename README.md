@@ -13,7 +13,7 @@
 
 ## Golyn Server
 
-The **Golyn Server** is a custom-built, multi-site web server designed to host and manage multiple websites efficiently. The primary purpose of this project is to host your **personal portfolio**, while also supporting additional websites thanks to its robust multi-site capabilities.
+The **Golyn Server** is a custom-built, multi-site web server designed to host and manage multiple websites efficiently. The primary purpose of this project is to host my **personal portfolio**, while also supporting additional websites thanks to its robust multi-site capabilities.
 
 This server is currently **under active development** and continues to expand with new features and optimizations.
 
