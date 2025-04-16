@@ -38,7 +38,7 @@ type SiteConfig struct {
 	ProxyTarget string
 	StaticFiles StaticFiles
 	Security    Security
-	Mail        SMTP
+	SMTP        SMTP
 }
 
 type Database struct {
@@ -77,10 +77,11 @@ type Log struct {
 }
 
 type SMTP struct {
-	Host     string
-	Port     int
-	Username string
-	Password string
+	Host              string
+	Port              int
+	Username          string
+	Password          string
+	RateLimitRequests int
 }
 
 type Config struct {
@@ -208,7 +209,7 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 	var staticFiles StaticFiles
 	var tls_ssl TLS_SSL
 	var security Security
-	var mail SMTP
+	var smtp SMTP
 	var ok bool
 	var err error
 
@@ -325,11 +326,13 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 	siteConfig.Security = security
 
 	// SMTP
-	mail.Host, _, _ = CheckString(siteSettings.Key("smtp_host"), false, sectionName, "smtp_host")
-	mail.Port, _, _ = CheckInt(siteSettings.Key("smtp_port"), false, sectionName, "smtp_port")
-	mail.Username, _, _ = CheckString(siteSettings.Key("smtp_user"), false, sectionName, "smtp_user")
-	mail.Password = os.ExpandEnv(siteSettings.Key("smtp_password").String())
-	siteConfig.Mail = mail
+	smtp.Host, _, _ = CheckString(siteSettings.Key("smtp_host"), false, sectionName, "smtp_host")
+	smtp.Port, _, _ = CheckInt(siteSettings.Key("smtp_port"), false, sectionName, "smtp_port")
+	smtp.Username, _, _ = CheckString(siteSettings.Key("smtp_user"), false, sectionName, "smtp_user")
+	smtp.Password = os.ExpandEnv(siteSettings.Key("smtp_password").String())
+	smtp.RateLimitRequests, _, _ = CheckInt(siteSettings.Key("smtp_ratelimit_requests"), false, sectionName, "smtp_ratelimit_requests")
+
+	siteConfig.SMTP = smtp
 	return siteConfig, nil
 }
 
