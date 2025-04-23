@@ -58,7 +58,7 @@ func SendmailHandler() gin.HandlerFunc {
 		passwordDecrypted, err := security.DecryptPassword(site.SMTP.Password)
 
 		from := site.SMTP.Username
-		to := request.Email
+		to := site.SMTP.Username
 		subject := fmt.Sprintf("Message from %s", request.Name)
 		body := fmt.Sprintf("Name: %s\nEmail: %s\nMessage: %s", request.Name, request.Email, request.Message)
 		message := []byte(fmt.Sprintf("To: %s\r\n"+
