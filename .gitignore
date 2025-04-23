@@ -43,5 +43,9 @@ builds/*.gz
 .idea/
 .DS_Store
 /certificates/portfolio/
+/certificates/golyn/
+/certificates/kayak/
+/certificates/leona/
+/certificates/portal.golyn/
 /docker/taiga/
 /builds/Golyn/
