@@ -29,7 +29,7 @@ func RedirectOrAllowHostMiddleware() gin.HandlerFunc {
 		// Skip redirection for API paths
 		if strings.HasPrefix(c.Request.URL.Path, "/api") {
 			log.Debug("redirectOrAllowHostMiddleware() | Skipping for API Path | Host: %s | Path: %s | Method: %s",
-				hostName, c.Request.URL.Path)
+				hostName, c.Request.URL.Path, c.Request.Method)
 			c.Next()
 			return
 		}

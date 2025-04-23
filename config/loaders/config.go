@@ -330,7 +330,7 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 	smtp.Port, _, _ = CheckInt(siteSettings.Key("smtp_port"), false, sectionName, "smtp_port")
 	smtp.Username, _, _ = CheckString(siteSettings.Key("smtp_user"), false, sectionName, "smtp_user")
 	smtp.Password = os.ExpandEnv(siteSettings.Key("smtp_password").String())
-	smtp.RateLimitRequests, _, _ = CheckInt(siteSettings.Key("smtp_ratelimit_requests"), false, sectionName, "smtp_ratelimit_requests")
+	smtp.RateLimitRequests, _, _ = CheckInt(siteSettings.Key("smtp_ratelimit_requests"), false, sectionName, "smtp_rate_limit_requests")
 
 	siteConfig.SMTP = smtp
 	return siteConfig, nil

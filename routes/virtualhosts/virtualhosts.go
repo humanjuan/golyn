@@ -17,7 +17,6 @@ func Setup(router *gin.Engine) map[string]app.VirtualHost {
 	log.Debug("Setup() | Configured virtual hosts")
 	config := globals.GetConfig()
 	virtualHosts := make(map[string]app.VirtualHost)
-	// processedDirectories := make(map[string]*gin.RouterGroup)
 
 	for _, siteConfig := range config.Sites {
 		if !siteConfig.Enabled {
@@ -56,10 +55,13 @@ func Setup(router *gin.Engine) map[string]app.VirtualHost {
 		// Asocia cada dominio con el `VirtualHost`
 		for _, domain := range siteConfig.Domains {
 			virtualHosts[domain] = app.VirtualHost{
-				HostName: domain,
-				BasePath: basePath,
-				// SiteGroup: processedDirectories[siteConfig.Directory],
-				SiteGroup: siteGroup,
+				HostName:    domain,
+				BasePath:    basePath,
+				SiteGroup:   siteGroup,
+				Proxy:       siteConfig.Proxy,
+				ProxyTarget: siteConfig.ProxyTarget,
+				Security:    siteConfig.Security,
+				SMTP:        siteConfig.SMTP,
 			}
 			log.Info("Setup() | Configured virtual host '%s' for site directory: %s", domain, basePath)
 		}
@@ -83,7 +85,6 @@ func BuildProxyHostMap(sites []loaders.SiteConfig) map[string]string {
 			}
 		}
 	}
-
 	return proxyMap
 }
 

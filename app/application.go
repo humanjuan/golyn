@@ -1,6 +1,7 @@
 package app
 
 import (
+	"Back/config/loaders"
 	"github.com/gin-gonic/gin"
 	"time"
 )
@@ -22,7 +23,11 @@ type Cert struct {
 }
 
 type VirtualHost struct {
-	HostName  string
-	BasePath  string
-	SiteGroup *gin.RouterGroup
+	HostName    string
+	BasePath    string
+	SiteGroup   *gin.RouterGroup
+	Proxy       bool
+	ProxyTarget string
+	Security    loaders.Security
+	SMTP        loaders.SMTP
 }
