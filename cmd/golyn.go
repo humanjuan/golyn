@@ -28,7 +28,7 @@ import (
 
 const (
 	version    string = "v1.0.0-12042025A"
-	mainDomain string = "humanjuan.com"
+	mainDomain string = "golyn.local"
 )
 
 func main() {
