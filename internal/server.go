@@ -53,6 +53,7 @@ func SetupServerHTTPS(router http.Handler) (*http.Server, error) {
 		Handler:        router,
 		ReadTimeout:    time.Duration(config.Server.ReadTimeoutSecond) * time.Second,
 		WriteTimeout:   time.Duration(config.Server.WriteTimeoutSecond) * time.Second,
+		IdleTimeout:    120 * time.Second,
 		MaxHeaderBytes: config.Server.MaxHeaderMB * 1024 * 1024,
 		TLSConfig:      tlsConfig,
 	}
@@ -109,7 +110,7 @@ func LoadAllCertificates(sites []loaders.SiteConfig) error {
 				continue
 			}
 
-			// The  certificate is expired
+			// The certificate is expired
 			certs, err := x509.ParseCertificates(cert.Certificate[0])
 			if err != nil {
 				log.Error("loadAllCertificates() | Failed to parse certificate. Fallback to HTTP only | Site: %s | Error: %v", site.Directory, err.Error())

@@ -158,6 +158,7 @@ func main() {
 
 	// APPLY MIDDLEWARE
 	serverRouter.Use(middlewares.CustomErrorHandler())
+	serverRouter.Use(middlewares.CompressionMiddleware())
 	serverRouter.Use(virtualhosts.CreateDynamicProxyHandler(proxyMap))
 	serverRouter.Use(middlewares.LoggingMiddleware())
 	serverRouter.Use(middlewares.SecureMiddleware(conf.Server.Dev))
