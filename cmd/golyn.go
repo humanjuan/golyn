@@ -28,7 +28,7 @@ import (
 
 const (
 	version    string = "v1.0.0-12042025A"
-	mainDomain string = "golyn.local"
+	mainDomain string = "humanjuan.com"
 )
 
 func main() {
@@ -176,7 +176,7 @@ func main() {
 	logApp.Info("main() | The server cache has been configured with an expiration time of %v minutes and %v minutes "+
 		"to clean up interval.", conf.Cache.ExpirationTime, conf.Cache.CleanUpInterval)
 
-	routes.ConfigureRoutes(serverRouter, serverInfo, mainDomain)
+	routes.ConfigureRoutes(serverRouter, serverInfo, mainDomain, conf.Server.Dev)
 
 	// SET INITIAL SERVER PARAMETERS FOR SITES SERVER
 	serverHTTPS, err := internal.SetupServerHTTPS(serverRouter)

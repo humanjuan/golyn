@@ -11,20 +11,32 @@ import (
 
 // Allow API request just for humanJuan (Golyn it's multisite)
 
-func RestrictAPIRequestMiddleware(allowHost string) gin.HandlerFunc {
+func RestrictAPIRequestMiddleware(allowHost string, dev bool) gin.HandlerFunc {
+	log := globals.GetAppLogger()
+	log.Debug("RestrictAPIRequestMiddleware()")
 	return func(c *gin.Context) {
-		log := globals.GetAppLogger()
-		log.Debug("RestrictAPIRequestMiddleware()")
 		hostParts := strings.Split(c.Request.Host, ":")
 		host := hostParts[0]
 
-		// PRODUCTION
-		if !strings.HasSuffix(host, allowHost) {
-			err := fmt.Errorf("access denied for host %s", host)
-			c.Error(utils.NewHTTPError(http.StatusForbidden, err.Error()))
-			c.Abort()
-			log.Warn("RestrictAPIRequestMiddleware() | Access denied | Host: %s | URL: %s", host, c.Request.URL)
-			return
+		if dev {
+			// DEV
+			allowDevHost := strings.TrimSuffix(allowHost, ".com") + ".local"
+			if !strings.HasSuffix(host, allowHost) && !strings.HasSuffix(host, allowDevHost) {
+				err := fmt.Errorf("access denied for host %s", host)
+				c.Error(utils.NewHTTPError(http.StatusForbidden, err.Error()))
+				c.Abort()
+				log.Warn("RestrictAPIRequestMiddleware() | Access denied | Host: %s | URL: %s", host, c.Request.URL)
+				return
+			}
+		} else {
+			// PRODUCTION
+			if !strings.HasSuffix(host, allowHost) {
+				err := fmt.Errorf("access denied for host %s", host)
+				c.Error(utils.NewHTTPError(http.StatusForbidden, err.Error()))
+				c.Abort()
+				log.Warn("RestrictAPIRequestMiddleware() | Access denied | Host: %s | URL: %s", host, c.Request.URL)
+				return
+			}
 		}
 		c.Next()
 	}
