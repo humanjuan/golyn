@@ -23,6 +23,8 @@ var AllowedExtensions = map[string]string{
 	".mp3":   "audio/mpeg",
 	".ogg":   "audio/ogg",
 	".html":  "text/html",
+	".txt":   "text/plain; charset=utf-8",
+	".xml":   "application/xml",
 }
 
 func GetMimeTypeFromCompressedFilePath(path string) string {

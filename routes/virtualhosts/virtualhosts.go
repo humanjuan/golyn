@@ -50,6 +50,12 @@ func Setup(router *gin.Engine) map[string]app.VirtualHost {
 
 			// Serve favicon
 			siteGroup.GET("/favicon.ico", routes.CreateStaticFileHandler(filepath.Join(siteConfig.StaticFiles.Assets, "favicon.ico")))
+
+			// SEO
+			siteGroup.GET("/robots.txt", routes.CreateStaticFileHandler(filepath.Join(basePath, "robots.txt")))
+			siteGroup.GET("/sitemap.xml", routes.CreateStaticFileHandler(filepath.Join(basePath, "sitemap.xml")))
+			siteGroup.GET("/humans.txt", routes.CreateStaticFileHandler(filepath.Join(basePath, "humans.txt")))
+
 		}
 
 		// Asocia cada dominio con el `VirtualHost`
