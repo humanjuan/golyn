@@ -5,10 +5,23 @@ import (
 	"Back/internal/utils"
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 )
+
+type CompressionType struct {
+	Name      string
+	Extension string
+}
+
+// CompressionTypes Ordered by priority: Brotli > Zstd > Gzip > Deflate > Normal
+var CompressionTypes = []CompressionType{
+	{Name: "br", Extension: ".br"},
+	{Name: "zstd", Extension: ".zst"},
+	{Name: "gzip", Extension: ".gzip"},
+	{Name: "deflate", Extension: ".deflate"},
+	{Name: "", Extension: ""},
+}
 
 func CompressionMiddleware() gin.HandlerFunc {
 	log := globals.GetAppLogger()
@@ -29,51 +42,41 @@ func CompressionMiddleware() gin.HandlerFunc {
 
 		requestPath := c.Request.URL.Path
 		cleanPath := strings.TrimPrefix(requestPath, "/")
-		fullPath := filepath.Join(virtualHost.BasePath, cleanPath)
-		if requestPath == "/" {
-			fullPath = filepath.Join(virtualHost.BasePath, "index.html")
-		}
+		siteName := filepath.Base(virtualHost.BasePath)
 
-		contentType := utils.GetMimeTypeFromCompressedFilePath(fullPath)
+		// Relative Path
+		relativePath := strings.TrimPrefix(cleanPath, siteName)
+		relativePath = strings.TrimPrefix(relativePath, "/")
 
 		acceptEncoding := c.GetHeader("Accept-Encoding")
 		c.Header("Vary", "Accept-Encoding")
+		contentType := utils.GetMimeTypeFromCompressedFilePath(relativePath)
 
-		// Brotli
-		if strings.Contains(acceptEncoding, "br") && fileExists(fullPath+".br") {
-			if fileExists(fullPath + ".br") {
-				c.Header("Content-Encoding", "br")
-				c.Header("Content-Type", contentType)
-				c.File(fullPath + ".br")
-				c.Abort()
-				return
-			}
-		}
-
-		// Gzip
-		if strings.Contains(acceptEncoding, "gzip") && fileExists(fullPath+".gz") {
-			if fileExists(fullPath + ".gz") {
-				c.Header("Content-Encoding", "gzip")
-				c.Header("Content-Type", contentType)
-				c.File(fullPath + ".gz")
-				c.Abort()
-				return
+		// Priority Order: Brotli > Zstd > Gzip > Deflate > Normal
+		for _, compression := range CompressionTypes {
+			if strings.Contains(acceptEncoding, compression.Name) && FileExistsCached(c, siteName, relativePath, compression.Name) {
+				fullPath := filepath.Join(virtualHost.BasePath, relativePath) + compression.Extension
+				if utils.FileOrDirectoryExists(fullPath) {
+					c.Header("Content-Encoding", compression.Name)
+					c.Header("Content-Type", contentType)
+					c.File(fullPath)
+					c.Abort()
+					return
+				}
 			}
 		}
 
 		// Normal file
-		if fileExists(fullPath) {
-			c.Header("Content-Type", contentType)
-			c.File(fullPath)
-			c.Abort()
-			return
+		if FileExistsCached(c, siteName, relativePath, "normal") {
+			fullPath := filepath.Join(virtualHost.BasePath, relativePath)
+			if utils.FileOrDirectoryExists(fullPath) {
+				c.Header("Content-Type", contentType)
+				c.File(fullPath)
+				c.Abort()
+				return
+			}
 		}
 
 		c.Next()
 	}
-}
-
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }

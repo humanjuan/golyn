@@ -157,6 +157,21 @@ func main() {
 	}
 
 	// APPLY MIDDLEWARE
+	// CREATE SERVER CACHE AND APPLY MORE MIDDLEWARE
+	if conf.Cache.ExpirationTime == 0 {
+		serverRouter.Use(middlewares.CacheMiddleware(cache.New(cache.NoExpiration, 0)))
+		logApp.Info("main() | The server cache has been configured with No expiration time and without clean " +
+			"up interval.")
+	} else {
+		serverRouter.Use(middlewares.CacheMiddleware(
+			cache.New(
+				time.Duration(conf.Cache.ExpirationTime)*time.Minute,
+				time.Duration(conf.Cache.CleanUpInterval)*time.Minute,
+			)),
+		)
+		logApp.Info("main() | The server cache has been configured with an expiration time of %v minutes and %v minutes "+
+			"to clean up interval.", conf.Cache.ExpirationTime, conf.Cache.CleanUpInterval)
+	}
 	serverRouter.Use(middlewares.CustomErrorHandler())
 	serverRouter.Use(middlewares.CompressionMiddleware())
 	serverRouter.Use(virtualhosts.CreateDynamicProxyHandler(proxyMap))
@@ -165,16 +180,6 @@ func main() {
 	serverRouter.Use(middlewares.RedirectOrAllowHostMiddleware())
 	serverRouter.Use(middlewares.CorsMiddleware(conf.Sites))
 	serverRouter.Use(middlewares.ClientCacheMiddleware(conf.Server.Dev))
-
-	// CREATE SERVER CACHE AND APPLY MORE MIDDLEWARE
-	serverRouter.Use(middlewares.CacheMiddleware(
-		cache.New(
-			time.Duration(conf.Cache.ExpirationTime)*time.Minute,
-			time.Duration(conf.Cache.CleanUpInterval)*time.Minute,
-		)),
-	)
-	logApp.Info("main() | The server cache has been configured with an expiration time of %v minutes and %v minutes "+
-		"to clean up interval.", conf.Cache.ExpirationTime, conf.Cache.CleanUpInterval)
 
 	routes.ConfigureRoutes(serverRouter, serverInfo, mainDomain, conf.Server.Dev)
 
