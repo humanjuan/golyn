@@ -47,6 +47,9 @@ func CompressionMiddleware() gin.HandlerFunc {
 		// Relative Path
 		relativePath := strings.TrimPrefix(cleanPath, siteName)
 		relativePath = strings.TrimPrefix(relativePath, "/")
+		if relativePath == "" {
+			relativePath = "index.html"
+		}
 
 		acceptEncoding := c.GetHeader("Accept-Encoding")
 		c.Header("Vary", "Accept-Encoding")
@@ -57,7 +60,10 @@ func CompressionMiddleware() gin.HandlerFunc {
 			if strings.Contains(acceptEncoding, compression.Name) && FileExistsCached(c, siteName, relativePath, compression.Name) {
 				fullPath := filepath.Join(virtualHost.BasePath, relativePath) + compression.Extension
 				if utils.FileOrDirectoryExists(fullPath) {
-					c.Header("Content-Encoding", compression.Name)
+					c.Header("Content-Type", contentType)
+					if compression.Name != "" {
+						c.Header("Content-Encoding", compression.Name)
+					}
 					c.Header("Content-Type", contentType)
 					c.File(fullPath)
 					c.Abort()
@@ -70,6 +76,7 @@ func CompressionMiddleware() gin.HandlerFunc {
 		if FileExistsCached(c, siteName, relativePath, "normal") {
 			fullPath := filepath.Join(virtualHost.BasePath, relativePath)
 			if utils.FileOrDirectoryExists(fullPath) {
+				contentType := utils.GetMimeTypeFromCompressedFilePath(relativePath)
 				c.Header("Content-Type", contentType)
 				c.File(fullPath)
 				c.Abort()
