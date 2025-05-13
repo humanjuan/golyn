@@ -49,3 +49,7 @@ builds/*.gz
 /certificates/portal.golyn/
 /docker/taiga/
 /builds/Golyn/
+/certificates/homer/
+/sites/homer/
+/sites/portal.humanjuan/
+/certificates/portal.humanjuan/

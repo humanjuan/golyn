@@ -30,7 +30,7 @@ func SecureMiddleware(isDev bool) gin.HandlerFunc {
 			"style-src 'self' 'unsafe-inline' https://stackpath.bootstrapcdn.com https://fonts.googleapis.com; " +
 			"font-src 'self' https://fonts.gstatic.com; " +
 			"connect-src 'self' https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; " +
-			"img-src 'self' https://humanjuan.com https://www.humanjuan.com;",
+			"img-src 'self' https://humanjuan.com https://www.humanjuan.com https://golyn.humanjuan.com;",
 	})
 
 	return func(c *gin.Context) {
