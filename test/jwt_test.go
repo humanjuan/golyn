@@ -32,7 +32,7 @@ type LoginResponse struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-const server string = "https://golyn.local/api/v1"
+const server string = "https://golyn.humanjuan.local/api/v1"
 
 func TestAuthenticationFlow(t *testing.T) {
 	client := createHttpClient()

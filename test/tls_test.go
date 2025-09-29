@@ -4,44 +4,55 @@ import (
 	"crypto/tls"
 	"net"
 	"testing"
+	"time"
 )
 
+// TestTLSVersions validates that TLS 1.2 and 1.3 are supported and that TLS 1.0 and 1.1 are not.
 func TestTLSVersions(t *testing.T) {
-	server := "golyn.local:443"
-	validateTLSVersions(t, server)
+
+	addr := "golyn.humanjuan.local:443"
+	serverName := "golyn.humanjuan.local"
+
+	t.Run("TLS1.2 supported", func(t *testing.T) {
+		if ok, err := attemptTLSHandshake(addr, serverName, tls.VersionTLS12); !ok {
+			t.Fatalf("expected TLS 1.2 to be supported, handshake failed: %v", err)
+		}
+	})
+
+	t.Run("TLS1.3 supported", func(t *testing.T) {
+		if ok, err := attemptTLSHandshake(addr, serverName, tls.VersionTLS13); !ok {
+			t.Fatalf("expected TLS 1.3 to be supported, handshake failed: %v", err)
+		}
+	})
+
+	t.Run("TLS1.0 not supported", func(t *testing.T) {
+		if ok, _ := attemptTLSHandshake(addr, serverName, tls.VersionTLS10); ok {
+			t.Fatalf("expected TLS 1.0 to be NOT supported, but handshake succeeded")
+		}
+	})
+
+	t.Run("TLS1.1 not supported", func(t *testing.T) {
+		if ok, _ := attemptTLSHandshake(addr, serverName, tls.VersionTLS11); ok {
+			t.Fatalf("expected TLS 1.1 to be NOT supported, but handshake succeeded")
+		}
+	})
 }
 
-func validateTLSVersions(t *testing.T, server string) {
-	versions := map[string]uint16{
-		"TLS1.0": tls.VersionTLS10,
-		"TLS1.1": tls.VersionTLS11,
-		"TLS1.2": tls.VersionTLS12,
-		"TLS1.3": tls.VersionTLS13,
+func attemptTLSHandshake(addr, serverName string, version uint16) (bool, error) {
+	d := &net.Dialer{Timeout: 10 * time.Second}
+	tlsCfg := &tls.Config{
+		InsecureSkipVerify: true, // We only validate protocol support here
+		ServerName:         serverName,
+		MinVersion:         version,
+		MaxVersion:         version,
 	}
-
-	for versionName, versionCode := range versions {
-		t.Logf("Testing %s...", versionName)
-
-		tlsConfig := &tls.Config{
-			InsecureSkipVerify: true,
-			MinVersion:         versionCode,
-			MaxVersion:         versionCode,
-		}
-
-		conn, err := net.Dial("tcp", server)
-		if err != nil {
-			t.Errorf("[NOK] Failed to connect to server: %s", err.Error())
-			continue
-		}
-		defer conn.Close()
-
-		c := tls.Client(conn, tlsConfig)
-		err = c.Handshake()
-		if err != nil {
-			t.Logf("[NOK] %s NOT SUPPORTED: %v", versionName, err)
-		} else {
-			t.Logf("[OK] %s SUPPORTED", versionName)
-		}
-		c.Close()
+	conn, err := tls.DialWithDialer(d, "tcp", addr, tlsCfg)
+	if err != nil {
+		return false, err
 	}
+	defer conn.Close()
+	if err := conn.Handshake(); err != nil {
+		return false, err
+	}
+	return true, nil
 }
