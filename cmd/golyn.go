@@ -28,7 +28,7 @@ import (
 // Documentation: https://gin-gonic.com/docs/quickstart/
 
 const (
-	version    string = "v1.0.0-28092025A"
+	version    string = "v1.0.0"
 	mainDomain string = "humanjuan.com"
 )
 
