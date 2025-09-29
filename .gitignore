@@ -53,3 +53,10 @@ builds/*.gz
 /sites/homer/
 /sites/portal.humanjuan/
 /certificates/portal.humanjuan/
+/config/sites/futzy.humanjuan.conf
+/sites/valheim/
+/sites/monitor/
+/sites/leona/
+/sites/futzy/
+/sites/rioclaro/
+/sites/ashcards/

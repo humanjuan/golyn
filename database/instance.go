@@ -4,8 +4,8 @@ import (
 	"Back/config/loaders"
 	"context"
 	"fmt"
+	"github.com/humanjuan/logger"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jpengineer/logger"
 )
 
 type DBInstance struct {

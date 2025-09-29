@@ -4,12 +4,13 @@ import (
 	"Back/internal/utils"
 	"errors"
 	"fmt"
-	"github.com/go-ini/ini"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"sync"
+
+	"github.com/go-ini/ini"
 )
 
 type StaticFiles struct {

@@ -3,7 +3,7 @@
 SCRIPT_DIR=$(cd "$(dirname "$0")"; pwd)
 
 container_name="Golyn_PostgreSQL"
-image_tag="jpengineer/centos7-postgresql15"
+image_tag="humanjuan/centos7-postgresql15"
 postgresql_dir="$SCRIPT_DIR/postgresql"
 volume_name="pgdata"
 

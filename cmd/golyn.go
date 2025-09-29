@@ -14,20 +14,21 @@ import (
 	"Back/routes/virtualhosts"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/patrickmn/go-cache"
 	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/patrickmn/go-cache"
 )
 
 // Documentation: https://gin-gonic.com/docs/quickstart/
 
 const (
-	version    string = "v1.0.0-12042025A"
+	version    string = "v1.0.0-28092025A"
 	mainDomain string = "humanjuan.com"
 )
 
@@ -172,10 +173,10 @@ func main() {
 		logApp.Info("main() | The server cache has been configured with an expiration time of %v minutes and %v minutes "+
 			"to clean up interval.", conf.Cache.ExpirationTime, conf.Cache.CleanUpInterval)
 	}
+	serverRouter.Use(middlewares.LoggingMiddleware())
 	serverRouter.Use(middlewares.CustomErrorHandler())
 	serverRouter.Use(middlewares.CompressionMiddleware())
 	serverRouter.Use(virtualhosts.CreateDynamicProxyHandler(proxyMap))
-	serverRouter.Use(middlewares.LoggingMiddleware())
 	serverRouter.Use(middlewares.SecureMiddleware(conf.Server.Dev))
 	serverRouter.Use(middlewares.RedirectOrAllowHostMiddleware())
 	serverRouter.Use(middlewares.CorsMiddleware(conf.Sites))

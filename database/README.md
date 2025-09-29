@@ -13,7 +13,7 @@ Defines the logic for initializing and managing the database instance, including
 - Closing the database connection when it's no longer needed.
 - Validating the database connection via ping and retrieving metadata such as the database version.
 
-This file uses `pgxpool` for connection pooling and relies on structured logging with the `github.com/jpengineer/logger` package.
+This file uses `pgxpool` for connection pooling and relies on structured logging with the `github.com/humanjuan/logger` package.
 
 ### 3. `queries.go`
 Contains pre-defined SQL queries and data structures for mapping query results. It includes:

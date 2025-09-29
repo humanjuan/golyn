@@ -109,7 +109,7 @@ func CreateDynamicProxyHandler(proxyMap map[string]string) gin.HandlerFunc {
 			return
 		}
 
-		log.Warn("CreateDynamicProxyHandler() | Host not found in proxyMap: %s", host)
+		log.Debug("CreateDynamicProxyHandler() | Host not found in proxyMap: %s", host)
 		c.Next()
 	}
 }

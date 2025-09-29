@@ -1,13 +1,13 @@
 <h1 align="center">
-  Golyn <img src="https://github.com/jpengineer/golyn/blob/main/sites/golyn/assets/Golyn.png?raw=true" alt="Golyn Logo" width="80"> Server
+  Golyn <img src="https://github.com/humanjuan/golyn/blob/main/sites/golyn/assets/Golyn.png?raw=true" alt="Golyn Logo" width="80"> Server
 </h1>
 
 ![Golang](https://img.shields.io/badge/Language-Go-blue?logo=go)
 ![Open Source](https://img.shields.io/badge/Open%20Source-Yes-brightgreen?logo=opensourceinitiative)
 ![Status](https://img.shields.io/badge/Status-In%20Development-orange?logo=githubactions)
-![Go Version](https://img.shields.io/badge/Go-v1.23.2-blue?logo=go)
+![Go Version](https://img.shields.io/badge/Go-v1.25.0-blue?logo=go)
 [![Gin Version](https://img.shields.io/badge/Gin%20Framework-v1.10.0-lightblue)](https://github.com/gin-gonic/gin)
-[![Logger](https://img.shields.io/badge/Logger-v1.6.1-lightblue)](https://github.com/jpengineer/logger)
+[![Logger](https://img.shields.io/badge/Logger-v1.6.2-lightblue)](https://github.com/humanjuan/logger)
 
 [//]: # ([![Buy Me a Coffee]&#40;https://img.shields.io/badge/Buy_Me_A_Coffee-Support-orange?logo=buy-me-a-coffee&style=flat-square&#41;]&#40;https://www.buymeacoffee.com/YOUR_PROFILE_LINK&#41;)
 
@@ -79,7 +79,7 @@ This server is currently **under active development** and continues to expand wi
 The server is developed in **Golang** and, as part of its architecture, uses the following components:
 
 - **[Gin framework](https://github.com/gin-gonic/gin)**: A high-performance HTTP web framework designed for building modular and fast applications.
-- **[Logger](https://github.com/jpengineer/logger)**: A custom logging library developed for advanced and highly configurable logging capabilities.
+- **[Logger](https://github.com/humanjuan/logger)**: A custom logging library developed for advanced and highly configurable logging capabilities.
 - **AES-GCM Encryption**: For sensitive configuration data
 - **Custom Middleware Stack**: For security, compression, and routing
 

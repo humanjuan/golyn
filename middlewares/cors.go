@@ -4,7 +4,7 @@ import (
 	"Back/config/loaders"
 	"Back/globals"
 	"github.com/gin-gonic/gin"
-	"github.com/jpengineer/logger"
+	"github.com/humanjuan/logger"
 	"net/http"
 	"net/url"
 )

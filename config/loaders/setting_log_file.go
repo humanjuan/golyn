@@ -2,9 +2,10 @@ package loaders
 
 import (
 	"fmt"
-	"github.com/jpengineer/logger"
 	"os"
 	"strings"
+
+	"github.com/humanjuan/logger"
 )
 
 func InitLogDB(name string, path string, level string, maxSizeMb int, maxBackup int) (*logger.Log, error) {
