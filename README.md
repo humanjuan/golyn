@@ -9,7 +9,7 @@
 [![Gin Version](https://img.shields.io/badge/Gin%20Framework-v1.10.0-lightblue)](https://github.com/gin-gonic/gin)
 [![Logger](https://img.shields.io/badge/Logger-v1.6.2-lightblue)](https://github.com/humanjuan/logger)
 
-[//]: # ([![Buy Me a Coffee]&#40;https://img.shields.io/badge/Buy_Me_A_Coffee-Support-orange?logo=buy-me-a-coffee&style=flat-square&#41;]&#40;https://www.buymeacoffee.com/YOUR_PROFILE_LINK&#41;)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy_Me_A_Coffee-Support-orange?logo=buy-me-a-coffee&style=flat-square)](https://www.buymeacoffee.com/humanjuan)
 
 ## Golyn Server
 
