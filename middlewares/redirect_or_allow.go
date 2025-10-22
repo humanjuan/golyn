@@ -53,30 +53,64 @@ func RedirectOrAllowHostMiddleware() gin.HandlerFunc {
 				hostName, requestedFile)
 
 			allowedExtensions := map[string]string{
-				".css":  "text/css",
-				".js":   "application/javascript",
-				".png":  "image/png",
-				".jpg":  "image/jpeg",
-				".jpeg": "image/jpeg",
-				".ico":  "image/x-icon",
-				".svg":  "image/svg+xml",
-				".webp": "image/webp",
-				".html": "text/html",
+				".css":   "text/css",
+				".js":    "application/javascript",
+				".png":   "image/png",
+				".jpg":   "image/jpeg",
+				".jpeg":  "image/jpeg",
+				".gif":   "image/gif",
+				".ico":   "image/x-icon",
+				".svg":   "image/svg+xml",
+				".webp":  "image/webp",
+				".html":  "text/html; charset=utf-8",
+				".json":  "application/json",
+				".txt":   "text/plain; charset=utf-8",
+				".xml":   "application/xml",
+				".map":   "application/octet-stream",
+				".woff":  "font/woff",
+				".woff2": "font/woff2",
+				".wasm":  "application/wasm",
 			}
-			extension := filepath.Ext(requestedFile)
-			if _, err := os.Stat(requestedFile); err == nil {
-				contentType, _ := allowedExtensions[extension]
-				c.Header("Content-Type", contentType)
+
+			// Case 1: Physical file exists -> serve it with proper headers
+			if fi, err := os.Stat(requestedFile); err == nil && !fi.IsDir() {
+				extension := filepath.Ext(requestedFile)
+				if contentType, ok := allowedExtensions[extension]; ok {
+					c.Header("Content-Type", contentType)
+				}
 				c.Header("X-Content-Type-Options", "nosniff")
 				c.Header("X-Frame-Options", "DENY")
 				c.File(requestedFile)
 				c.Abort()
 				return
-			} else {
-				log.Warn("redirectOrAllowHostMiddleware() | File Not Found or Inaccessible | Host: %s | RequestedFile: %s | Error: %v", hostName, requestedFile, err.Error())
 			}
+
+			// Case 2: No physical file -> SPA fallback for routes without extension
+			spaIndex := filepath.Join(sitePath, "index.html")
+			pathHasExt := strings.Contains(c.Request.URL.Path, ".")
+			if !pathHasExt {
+				if fi, err := os.Stat(spaIndex); err == nil && !fi.IsDir() {
+					c.Header("Content-Type", "text/html; charset=utf-8")
+					c.File(spaIndex)
+					c.Abort()
+					return
+				}
+				// index.html missing -> 404
+				err := fmt.Errorf("SPA index not found: %s", spaIndex)
+				c.Error(utils.NewHTTPError(http.StatusNotFound, err.Error()))
+				c.Abort()
+				return
+			}
+
+			// Path has extension and file not found -> don't hide asset errors
+			log.Warn("redirectOrAllowHostMiddleware() | File Not Found | Host: %s | RequestedFile: %s", hostName, requestedFile)
+			err := fmt.Errorf("the requested resource was not found: %s", c.Request.URL.Path)
+			c.Error(utils.NewHTTPError(http.StatusNotFound, err.Error()))
+			c.Abort()
+			return
 		}
 
+		// Host not configured
 		log.Warn("redirectOrAllowHostMiddleware() | Host Not Configured | Host: %s | Path: %s", hostName, c.Request.URL.Path)
 		err := fmt.Errorf("the requested route does not exist: %s", c.Request.URL.Path)
 		c.Error(utils.NewHTTPError(http.StatusNotFound, err.Error()))
