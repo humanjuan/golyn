@@ -60,3 +60,10 @@ builds/*.gz
 /sites/futzy/
 /sites/rioclaro/
 /sites/ashcards/
+/certificates/valheim/
+/certificates/rioclaro/
+/certificates/monitor/
+/certificates/ashcards/
+/certificates/futzy/
+/certificates/iOG26/
+/sites/iOG26/
