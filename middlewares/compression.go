@@ -2,8 +2,8 @@ package middlewares
 
 import (
 	"github.com/gin-gonic/gin"
-	"golyn/globals"
-	"golyn/internal/utils"
+	"github.com/humanjuan/golyn/globals"
+	"github.com/humanjuan/golyn/internal/utils"
 	"net/http"
 	"path/filepath"
 	"strings"

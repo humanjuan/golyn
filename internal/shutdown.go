@@ -2,7 +2,7 @@ package internal
 
 import (
 	"context"
-	"golyn/globals"
+	"github.com/humanjuan/golyn/globals"
 	"net/http"
 	"os"
 	"os/signal"

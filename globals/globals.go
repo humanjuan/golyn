@@ -2,10 +2,10 @@ package globals
 
 import (
 	"crypto/tls"
-	"golyn/app"
-	"golyn/config/loaders"
-	"golyn/database"
-	"golyn/internal/utils"
+	"github.com/humanjuan/golyn/app"
+	"github.com/humanjuan/golyn/config/loaders"
+	"github.com/humanjuan/golyn/database"
+	"github.com/humanjuan/golyn/internal/utils"
 	"html/template"
 	"sync"
 

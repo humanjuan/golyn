@@ -3,9 +3,9 @@ package handlers
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"golyn/database"
-	"golyn/globals"
-	"golyn/internal/utils"
+	"github.com/humanjuan/golyn/database"
+	"github.com/humanjuan/golyn/globals"
+	"github.com/humanjuan/golyn/internal/utils"
 	"net/http"
 )
 

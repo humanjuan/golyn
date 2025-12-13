@@ -3,8 +3,8 @@ package middlewares
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/humanjuan/acacia/v2"
-	"golyn/config/loaders"
-	"golyn/globals"
+	"github.com/humanjuan/golyn/config/loaders"
+	"github.com/humanjuan/golyn/globals"
 	"net/http"
 	"net/url"
 )

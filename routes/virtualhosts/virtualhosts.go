@@ -3,11 +3,11 @@ package virtualhosts
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"golyn/app"
-	"golyn/config/loaders"
-	"golyn/globals"
-	"golyn/middlewares"
-	"golyn/routes"
+	"github.com/humanjuan/golyn/app"
+	"github.com/humanjuan/golyn/config/loaders"
+	"github.com/humanjuan/golyn/globals"
+	"github.com/humanjuan/golyn/middlewares"
+	"github.com/humanjuan/golyn/routes"
 	"os"
 	"path/filepath"
 )

@@ -3,7 +3,7 @@ package loaders
 import (
 	"errors"
 	"fmt"
-	"golyn/internal/utils"
+	"github.com/humanjuan/golyn/internal/utils"
 	"os"
 	"path/filepath"
 	"runtime"

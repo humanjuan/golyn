@@ -3,9 +3,9 @@ package middlewares
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/humanjuan/golyn/globals"
+	"github.com/humanjuan/golyn/internal/utils"
 	"github.com/patrickmn/go-cache"
-	"golyn/globals"
-	"golyn/internal/utils"
 	"net/http"
 	"path/filepath"
 )

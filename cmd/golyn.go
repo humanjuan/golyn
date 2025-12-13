@@ -3,23 +3,24 @@ package main
 import (
 	"errors"
 	"fmt"
-	"golyn/app"
-	"golyn/config/loaders"
-	"golyn/database"
-	"golyn/globals"
-	"golyn/internal"
-	"golyn/internal/cli"
-	"golyn/internal/handlers"
-	"golyn/internal/utils"
-	"golyn/middlewares"
-	"golyn/routes"
-	"golyn/routes/virtualhosts"
 	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/humanjuan/golyn/app"
+	"github.com/humanjuan/golyn/config/loaders"
+	"github.com/humanjuan/golyn/database"
+	"github.com/humanjuan/golyn/globals"
+	"github.com/humanjuan/golyn/internal"
+	"github.com/humanjuan/golyn/internal/cli"
+	"github.com/humanjuan/golyn/internal/handlers"
+	"github.com/humanjuan/golyn/internal/utils"
+	"github.com/humanjuan/golyn/middlewares"
+	"github.com/humanjuan/golyn/routes"
+	"github.com/humanjuan/golyn/routes/virtualhosts"
 
 	"github.com/gin-gonic/gin"
 	"github.com/patrickmn/go-cache"
@@ -28,7 +29,7 @@ import (
 // Documentation: https://gin-gonic.com/docs/quickstart/
 
 const (
-	version    string = "v1.2.1"
+	version    string = "v1.2.2"
 	mainDomain string = "humanjuan.com"
 )
 

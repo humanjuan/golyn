@@ -2,7 +2,7 @@ package cli
 
 import (
 	"fmt"
-	"golyn/internal/security"
+	"github.com/humanjuan/golyn/internal/security"
 	"os"
 	"strings"
 )

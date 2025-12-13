@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
-	"golyn/globals"
+	"github.com/humanjuan/golyn/globals"
 	"time"
 )
 

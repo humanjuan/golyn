@@ -2,7 +2,7 @@ package app
 
 import (
 	"github.com/gin-gonic/gin"
-	"golyn/config/loaders"
+	"github.com/humanjuan/golyn/config/loaders"
 	"time"
 )
 

@@ -2,8 +2,8 @@ package middlewares
 
 import (
 	"fmt"
-	"golyn/globals"
-	"golyn/internal/utils"
+	"github.com/humanjuan/golyn/globals"
+	"github.com/humanjuan/golyn/internal/utils"
 	"time"
 
 	"github.com/gin-gonic/gin"

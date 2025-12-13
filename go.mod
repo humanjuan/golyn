@@ -1,4 +1,4 @@
-module golyn
+module github.com/humanjuan/golyn
 
 go 1.23.0
 

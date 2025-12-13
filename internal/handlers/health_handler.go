@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"github.com/gin-gonic/gin"
-	"golyn/internal/utils"
+	"github.com/humanjuan/golyn/internal/utils"
 	"net/http"
 )
 

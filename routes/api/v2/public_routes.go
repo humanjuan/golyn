@@ -2,7 +2,7 @@ package v2
 
 import (
 	"github.com/gin-gonic/gin"
-	"golyn/app"
+	"github.com/humanjuan/golyn/app"
 )
 
 func RegisterPublicRoutes(router *gin.RouterGroup, serverInfo *app.Info) {

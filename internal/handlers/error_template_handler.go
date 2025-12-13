@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"fmt"
-	"golyn/globals"
-	"golyn/internal/utils"
+	"github.com/humanjuan/golyn/globals"
+	"github.com/humanjuan/golyn/internal/utils"
 	"html/template"
 	"net/http"
 	"path/filepath"

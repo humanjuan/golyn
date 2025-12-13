@@ -3,9 +3,9 @@ package routes
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"golyn/globals"
-	"golyn/internal/handlers"
-	"golyn/internal/utils"
+	"github.com/humanjuan/golyn/globals"
+	"github.com/humanjuan/golyn/internal/handlers"
+	"github.com/humanjuan/golyn/internal/utils"
 	"mime"
 	"net/http"
 	"path/filepath"
