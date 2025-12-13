@@ -6,7 +6,7 @@ import (
 	"Back/database"
 	"Back/internal/utils"
 	"crypto/tls"
-	"github.com/humanjuan/logger"
+	"github.com/humanjuan/acacia/v2"
 	"html/template"
 	"sync"
 )
@@ -15,8 +15,8 @@ var RenderTemplate = true
 var (
 	config              *loaders.Config
 	dbInstance          *database.DBInstance
-	appLogger           *logger.Log
-	dbLogger            *logger.Log
+	appLogger           *acacia.Log
+	dbLogger            *acacia.Log
 	ErrorTemplate       *template.Template
 	VirtualHosts        map[string]app.VirtualHost
 	DefaultSite         string
@@ -42,19 +42,19 @@ func GetDBInstance() *database.DBInstance {
 	return dbInstance
 }
 
-func SetAppLogger(log *logger.Log) {
+func SetAppLogger(log *acacia.Log) {
 	appLogger = log
 }
 
-func SetDBLogger(log *logger.Log) {
+func SetDBLogger(log *acacia.Log) {
 	dbLogger = log
 }
 
-func GetAppLogger() *logger.Log {
+func GetAppLogger() *acacia.Log {
 	return appLogger
 }
 
-func GetDBLogger() *logger.Log {
+func GetDBLogger() *acacia.Log {
 	return dbLogger
 }
 

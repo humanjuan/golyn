@@ -4,7 +4,7 @@ import (
 	"Back/config/loaders"
 	"context"
 	"fmt"
-	"github.com/humanjuan/logger"
+	"github.com/humanjuan/acacia/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -12,7 +12,7 @@ type DBInstance struct {
 	db *pgxpool.Pool
 }
 
-func (dbi *DBInstance) InitDB(config *loaders.Database, log *logger.Log) error {
+func (dbi *DBInstance) InitDB(config *loaders.Database, log *acacia.Log) error {
 	var err error
 	log.Info("DB user: %s | DB name: %s | DB schema: %s | DB host: %s | DB port: %d",
 		config.Username, config.Database, config.Schema, config.Host, config.Port)

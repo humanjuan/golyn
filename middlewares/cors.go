@@ -4,7 +4,7 @@ import (
 	"Back/config/loaders"
 	"Back/globals"
 	"github.com/gin-gonic/gin"
-	"github.com/humanjuan/logger"
+	"github.com/humanjuan/acacia/v2"
 	"net/http"
 	"net/url"
 )
@@ -38,7 +38,7 @@ func CorsMiddleware(sites []loaders.SiteConfig) gin.HandlerFunc {
 	}
 }
 
-func getAllowedOrigins(sites []loaders.SiteConfig, log *logger.Log) []string {
+func getAllowedOrigins(sites []loaders.SiteConfig, log *acacia.Log) []string {
 	originSet := make(map[string]struct{})
 	var allowedOrigins []string
 

@@ -7,7 +7,7 @@
 ![Status](https://img.shields.io/badge/Status-In%20Development-orange?logo=githubactions)
 ![Go Version](https://img.shields.io/badge/Go-v1.25.0-blue?logo=go)
 [![Gin Version](https://img.shields.io/badge/Gin%20Framework-v1.10.0-lightblue)](https://github.com/gin-gonic/gin)
-[![Logger](https://img.shields.io/badge/Logger-v1.6.2-lightblue)](https://github.com/humanjuan/logger)
+[![Logger](https://img.shields.io/badge/Acacia-v2.2.0-lightblue)](https://github.com/humanjuan/acacia)
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy_Me_A_Coffee-Support-orange?logo=buy-me-a-coffee&style=flat-square)](https://www.buymeacoffee.com/humanjuan)
 
@@ -79,7 +79,7 @@ This server is currently **under active development** and continues to expand wi
 The server is developed in **Golang** and, as part of its architecture, uses the following components:
 
 - **[Gin framework](https://github.com/gin-gonic/gin)**: A high-performance HTTP web framework designed for building modular and fast applications.
-- **[Logger](https://github.com/humanjuan/logger)**: A custom logging library developed for advanced and highly configurable logging capabilities.
+- **[Logger](https://github.com/humanjuan/acacia)**: A custom logging library developed for advanced and highly configurable logging capabilities.
 - **AES-GCM Encryption**: For sensitive configuration data
 - **Custom Middleware Stack**: For security, compression, and routing
 

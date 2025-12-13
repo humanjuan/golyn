@@ -4,8 +4,9 @@ import (
 	"Back/globals"
 	"Back/internal/utils"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 func LoggingMiddleware() gin.HandlerFunc {
