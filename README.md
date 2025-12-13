@@ -7,7 +7,7 @@
 ![Status](https://img.shields.io/badge/Status-In%20Development-orange?logo=githubactions)
 ![Go Version](https://img.shields.io/badge/Go-v1.25.0-blue?logo=go)
 [![Gin Version](https://img.shields.io/badge/Gin%20Framework-v1.10.0-lightblue)](https://github.com/gin-gonic/gin)
-[![Logger](https://img.shields.io/badge/Acacia-v2.2.0-lightblue)](https://github.com/humanjuan/acacia)
+[![Logger](https://img.shields.io/badge/Acacia-v2-lightblue)](https://github.com/humanjuan/acacia)
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy_Me_A_Coffee-Support-orange?logo=buy-me-a-coffee&style=flat-square)](https://www.buymeacoffee.com/humanjuan)
 
