@@ -4,6 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/humanjuan/golyn/config/loaders"
 	"time"
+
+	_ "github.com/humanjuan/acacia/v2"
 )
 
 type Info struct {
