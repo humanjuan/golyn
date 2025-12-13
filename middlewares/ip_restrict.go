@@ -1,10 +1,10 @@
 package middlewares
 
 import (
-	"Back/globals"
-	"Back/internal/utils"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"golyn/globals"
+	"golyn/internal/utils"
 	"net/http"
 	"strings"
 )

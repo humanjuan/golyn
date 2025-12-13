@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"Back/globals"
-	"Back/internal/utils"
 	"fmt"
+	"golyn/globals"
+	"golyn/internal/utils"
 	"html/template"
 	"net/http"
 	"path/filepath"

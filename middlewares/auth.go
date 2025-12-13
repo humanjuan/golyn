@@ -1,11 +1,11 @@
 package middlewares
 
 import (
-	"Back/globals"
-	"Back/internal/utils"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"golyn/globals"
+	"golyn/internal/utils"
 	"net/http"
 	"strings"
 )

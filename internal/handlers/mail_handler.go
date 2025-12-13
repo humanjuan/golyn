@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"Back/globals"
-	"Back/internal/security"
-	"Back/internal/utils"
 	"crypto/tls"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"golyn/globals"
+	"golyn/internal/security"
+	"golyn/internal/utils"
 	"net/http"
 	"net/smtp"
 	"time"

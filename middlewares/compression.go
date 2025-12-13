@@ -1,9 +1,9 @@
 package middlewares
 
 import (
-	"Back/globals"
-	"Back/internal/utils"
 	"github.com/gin-gonic/gin"
+	"golyn/globals"
+	"golyn/internal/utils"
 	"net/http"
 	"path/filepath"
 	"strings"

@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"Back/database"
-	"Back/globals"
-	"Back/internal/utils"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"golyn/database"
+	"golyn/globals"
+	"golyn/internal/utils"
 	"net/http"
 )
 

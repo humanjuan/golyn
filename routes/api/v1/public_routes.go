@@ -1,11 +1,11 @@
 package v1
 
 import (
-	"Back/app"
-	"Back/internal/handlers"
-	"Back/middlewares"
-	"Back/modules/auth"
 	"github.com/gin-gonic/gin"
+	"golyn/app"
+	"golyn/internal/handlers"
+	"golyn/middlewares"
+	"golyn/modules/auth"
 )
 
 func RegisterPublicRoutes(router *gin.RouterGroup, serverInfo *app.Info) {

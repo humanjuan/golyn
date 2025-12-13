@@ -1,8 +1,8 @@
 package v2
 
 import (
-	"Back/app"
 	"github.com/gin-gonic/gin"
+	"golyn/app"
 )
 
 func RegisterPublicRoutes(router *gin.RouterGroup, serverInfo *app.Info) {

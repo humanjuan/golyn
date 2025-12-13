@@ -1,16 +1,16 @@
 package auth
 
 import (
-	"Back/database"
-	"Back/globals"
-	"Back/internal/utils"
-	"Back/middlewares"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/patrickmn/go-cache"
 	"golang.org/x/crypto/bcrypt"
+	"golyn/database"
+	"golyn/globals"
+	"golyn/internal/utils"
+	"golyn/middlewares"
 	"net/http"
 	"time"
 )

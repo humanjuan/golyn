@@ -1,10 +1,10 @@
 package auth
 
 import (
-	"Back/globals"
 	"errors"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
+	"golyn/globals"
 	"time"
 )
 

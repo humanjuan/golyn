@@ -1,11 +1,11 @@
 package database
 
 import (
-	"Back/config/loaders"
 	"context"
 	"fmt"
 	"github.com/humanjuan/acacia/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golyn/config/loaders"
 )
 
 type DBInstance struct {

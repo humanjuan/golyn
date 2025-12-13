@@ -1,11 +1,11 @@
 package routes
 
 import (
-	"Back/globals"
-	"Back/internal/handlers"
-	"Back/internal/utils"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"golyn/globals"
+	"golyn/internal/handlers"
+	"golyn/internal/utils"
 	"mime"
 	"net/http"
 	"path/filepath"

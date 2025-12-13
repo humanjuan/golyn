@@ -1,10 +1,10 @@
 package middlewares
 
 import (
-	"Back/config/loaders"
-	"Back/globals"
 	"github.com/gin-gonic/gin"
 	"github.com/humanjuan/acacia/v2"
+	"golyn/config/loaders"
+	"golyn/globals"
 	"net/http"
 	"net/url"
 )

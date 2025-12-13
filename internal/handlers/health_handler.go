@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"Back/internal/utils"
 	"github.com/gin-gonic/gin"
+	"golyn/internal/utils"
 	"net/http"
 )
 

@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"Back/globals"
-	"Back/internal/utils"
 	"bufio"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"golyn/globals"
+	"golyn/internal/utils"
 	"net/http"
 	"os"
 	"path/filepath"

@@ -1,9 +1,9 @@
 package loaders
 
 import (
-	"Back/internal/utils"
 	"errors"
 	"fmt"
+	"golyn/internal/utils"
 	"os"
 	"path/filepath"
 	"runtime"

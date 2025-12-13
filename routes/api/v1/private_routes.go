@@ -1,8 +1,8 @@
 package v1
 
 import (
-	"Back/internal/handlers"
 	"github.com/gin-gonic/gin"
+	"golyn/internal/handlers"
 )
 
 func RegisterPrivateRoutes(router *gin.RouterGroup) {

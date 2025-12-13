@@ -1,11 +1,11 @@
 package middlewares
 
 import (
-	"Back/globals"
-	"Back/internal/utils"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/unrolled/secure"
+	"golyn/globals"
+	"golyn/internal/utils"
 	"net/http"
 	"strings"
 )

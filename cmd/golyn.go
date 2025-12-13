@@ -1,19 +1,19 @@
 package main
 
 import (
-	"Back/app"
-	"Back/config/loaders"
-	"Back/database"
-	"Back/globals"
-	"Back/internal"
-	"Back/internal/cli"
-	"Back/internal/handlers"
-	"Back/internal/utils"
-	"Back/middlewares"
-	"Back/routes"
-	"Back/routes/virtualhosts"
 	"errors"
 	"fmt"
+	"golyn/app"
+	"golyn/config/loaders"
+	"golyn/database"
+	"golyn/globals"
+	"golyn/internal"
+	"golyn/internal/cli"
+	"golyn/internal/handlers"
+	"golyn/internal/utils"
+	"golyn/middlewares"
+	"golyn/routes"
+	"golyn/routes/virtualhosts"
 	"net/http"
 	"os"
 	"runtime"
@@ -28,7 +28,7 @@ import (
 // Documentation: https://gin-gonic.com/docs/quickstart/
 
 const (
-	version    string = "v1.2.0"
+	version    string = "v1.2.1"
 	mainDomain string = "humanjuan.com"
 )
 

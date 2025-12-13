@@ -1,12 +1,12 @@
 package internal
 
 import (
-	"Back/config/loaders"
-	"Back/globals"
-	"Back/internal/utils"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"golyn/config/loaders"
+	"golyn/globals"
+	"golyn/internal/utils"
 	"net/http"
 	"strconv"
 	"time"

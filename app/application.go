@@ -1,8 +1,8 @@
 package app
 
 import (
-	"Back/config/loaders"
 	"github.com/gin-gonic/gin"
+	"golyn/config/loaders"
 	"time"
 )
 

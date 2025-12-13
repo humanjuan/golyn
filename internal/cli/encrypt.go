@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"Back/internal/security"
 	"fmt"
+	"golyn/internal/security"
 	"os"
 	"strings"
 )

@@ -1,13 +1,13 @@
 package virtualhosts
 
 import (
-	"Back/app"
-	"Back/config/loaders"
-	"Back/globals"
-	"Back/middlewares"
-	"Back/routes"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"golyn/app"
+	"golyn/config/loaders"
+	"golyn/globals"
+	"golyn/middlewares"
+	"golyn/routes"
 	"os"
 	"path/filepath"
 )

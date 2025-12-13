@@ -1,12 +1,12 @@
 package middlewares
 
 import (
-	"Back/globals"
-	"Back/internal/utils"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"golyn/globals"
+	"golyn/internal/utils"
 	"net/http"
 	"time"
 )

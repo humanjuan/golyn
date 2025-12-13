@@ -1,11 +1,11 @@
 package routes
 
 import (
-	"Back/app"
-	"Back/middlewares"
-	v1 "Back/routes/api/v1"
-	v2 "Back/routes/api/v2"
 	"github.com/gin-gonic/gin"
+	"golyn/app"
+	"golyn/middlewares"
+	v1 "golyn/routes/api/v1"
+	v2 "golyn/routes/api/v2"
 )
 
 // ConfigureRoutes registra todas las rutas en el servidor

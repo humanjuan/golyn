@@ -1,11 +1,11 @@
 package middlewares
 
 import (
-	"Back/globals"
-	"Back/internal/handlers"
-	"Back/internal/utils"
 	"errors"
 	"github.com/gin-gonic/gin"
+	"golyn/globals"
+	"golyn/internal/handlers"
+	"golyn/internal/utils"
 	"net/http"
 	"strings"
 )

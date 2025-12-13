@@ -1,4 +1,4 @@
-module Back
+module golyn
 
 go 1.23.0
 

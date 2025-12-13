@@ -1,14 +1,15 @@
 package globals
 
 import (
-	"Back/app"
-	"Back/config/loaders"
-	"Back/database"
-	"Back/internal/utils"
 	"crypto/tls"
-	"github.com/humanjuan/acacia/v2"
+	"golyn/app"
+	"golyn/config/loaders"
+	"golyn/database"
+	"golyn/internal/utils"
 	"html/template"
 	"sync"
+
+	"github.com/humanjuan/acacia/v2"
 )
 
 var RenderTemplate = true

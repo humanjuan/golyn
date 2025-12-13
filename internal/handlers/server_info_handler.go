@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"Back/app"
-	"Back/globals"
-	"Back/internal/utils"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"golyn/app"
+	"golyn/globals"
+	"golyn/internal/utils"
 	"net/http"
 	"os"
 	"runtime"

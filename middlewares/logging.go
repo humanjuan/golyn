@@ -1,9 +1,9 @@
 package middlewares
 
 import (
-	"Back/globals"
-	"Back/internal/utils"
 	"fmt"
+	"golyn/globals"
+	"golyn/internal/utils"
 	"time"
 
 	"github.com/gin-gonic/gin"

@@ -1,8 +1,8 @@
 package internal
 
 import (
-	"Back/globals"
 	"context"
+	"golyn/globals"
 	"net/http"
 	"os"
 	"os/signal"
