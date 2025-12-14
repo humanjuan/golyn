@@ -8,6 +8,10 @@ import (
 )
 
 func GetBasePath() (string, error) {
+	if dir := os.Getenv("GOLYN_BASE_PATH"); dir != "" {
+		return filepath.Abs(dir)
+	}
+
 	exePath, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("failed to get executable path: %w", err)
