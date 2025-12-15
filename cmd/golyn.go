@@ -18,14 +18,16 @@ import (
 	"github.com/humanjuan/golyn/internal"
 	"github.com/humanjuan/golyn/internal/cli"
 	"github.com/humanjuan/golyn/internal/handlers"
-	"github.com/humanjuan/golyn/internal/lifecycle"
 	"github.com/humanjuan/golyn/internal/utils"
+	"github.com/humanjuan/golyn/lifecycle"
 	"github.com/humanjuan/golyn/middlewares"
 	"github.com/humanjuan/golyn/routes"
 	"github.com/humanjuan/golyn/routes/virtualhosts"
 
 	"github.com/gin-gonic/gin"
 	"github.com/patrickmn/go-cache"
+
+	_ "github.com/humanjuan/golyn-ai/register"
 )
 
 // Documentation: https://gin-gonic.com/docs/quickstart/
@@ -150,6 +152,9 @@ func main() {
 	// START GIN FRAMEWORK
 	serverRouter := gin.Default()
 
+	// EXPOSE ROUTER TO GOLYN-AI
+	app.SetRouter(serverRouter)
+
 	// VIRTUAL HOSTS
 	globals.VirtualHosts = virtualhosts.Setup(serverRouter)
 	proxyMap := virtualhosts.BuildProxyHostMap(conf.Sites)
@@ -189,13 +194,10 @@ func main() {
 
 	// LIFECYCLE: OnStart hooks
 	ctx := context.Background()
-	for _, h := range lifecycle.All() {
-		if err := h.OnStart(ctx); err != nil {
-			logApp.Warn(
-				"lifecycle hook failed on start",
-				err,
-			)
-		}
+
+	if err := lifecycle.Start(ctx); err != nil {
+		logApp.Error("main() | lifecycle start failed: %v", err)
+		os.Exit(1)
 	}
 
 	// SET INITIAL SERVER PARAMETERS FOR SITES SERVER
@@ -260,15 +262,7 @@ func main() {
 		internal.CatchSignalDual(serverHTTPS, serverHTTP)
 
 		// LIFECYCLE: OnShutdown hooks
-		ctx := context.Background()
-		for _, h := range lifecycle.All() {
-			if err := h.OnShutdown(ctx); err != nil {
-				logApp.Warn(
-					"lifecycle hook failed on shutdown",
-					err,
-				)
-			}
-		}
+		lifecycle.Shutdown(ctx)
 	}()
 
 	wg.Wait()
