@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"github.com/humanjuan/golyn/internal"
 	"github.com/humanjuan/golyn/internal/cli"
 	"github.com/humanjuan/golyn/internal/handlers"
+	"github.com/humanjuan/golyn/internal/lifecycle"
 	"github.com/humanjuan/golyn/internal/utils"
 	"github.com/humanjuan/golyn/middlewares"
 	"github.com/humanjuan/golyn/routes"
@@ -185,6 +187,17 @@ func main() {
 
 	routes.ConfigureRoutes(serverRouter, serverInfo, mainDomain, conf.Server.Dev)
 
+	// LIFECYCLE: OnStart hooks
+	ctx := context.Background()
+	for _, h := range lifecycle.All() {
+		if err := h.OnStart(ctx); err != nil {
+			logApp.Warn(
+				"lifecycle hook failed on start",
+				err,
+			)
+		}
+	}
+
 	// SET INITIAL SERVER PARAMETERS FOR SITES SERVER
 	serverHTTPS, err := internal.SetupServerHTTPS(serverRouter)
 	if err != nil {
@@ -245,6 +258,17 @@ func main() {
 	go func() {
 		defer wg.Done()
 		internal.CatchSignalDual(serverHTTPS, serverHTTP)
+
+		// LIFECYCLE: OnShutdown hooks
+		ctx := context.Background()
+		for _, h := range lifecycle.All() {
+			if err := h.OnShutdown(ctx); err != nil {
+				logApp.Warn(
+					"lifecycle hook failed on shutdown",
+					err,
+				)
+			}
+		}
 	}()
 
 	wg.Wait()
