@@ -71,9 +71,84 @@ This server is currently **under active development** and continues to expand wi
 - Content-Type optimization for XML and text files
 - Automated metadata handling
 
-### Extensible Architecture
-- Built with modularity in mind, making it easy to add features or scale the server as required.
-- Supports logging, caching, JWT authentication (planned), and asset management for scalability and performance.
+### Extensible Architecture (Extension System)
+Golyn features a robust, secure, and orchestrated extension system that allows external modules (like `golyn-ai`) to integrate deeply with the Core.
+
+- **Orchestrated Lifecycle**: Extensions register themselves using a protected handshake (`id` and `secret`).
+- **Dynamic Configuration**: Supports environment variable injection in configuration files (both in Core and `golyn-ai`) using `${VAR_NAME}` syntax for secrets and environment-specific paths.
+- **Route Sandboxing**: Each extension receives a protected route group (e.g., `/api/v1/extension/{id}/`), preventing them from overwriting Core routes.
+- **Emergency Flag**: Use `--no-extensions` to disable all external modules for maintenance.
+
+---
+
+## Extension Integration Guide
+
+If you want to create or integrate a new module (e.g., `example-ai`), follow these steps:
+
+### 1. Implement the Lifecycle Hooks
+Your module must implement the `lifecycle.Hook` interface and optionally `lifecycle.RouterHook`.
+
+```go
+type MyModule struct {}
+
+func (m *MyModule) OnStart(ctx context.Context) error {
+    // Initialization logic
+    return nil
+}
+
+func (m *MyModule) OnShutdown(ctx context.Context) error {
+    // Cleanup logic
+    return nil
+}
+
+func (m *MyModule) OnRouterReady(group *gin.RouterGroup) {
+    // Register your routes here
+    // Base path: /api/v1/extension/{your-id}/
+    group.GET("/status", handleStatus)
+}
+```
+
+### 2. Auto-Registration
+Create a `register` package in your module that uses environment variables for identity:
+
+```go
+package register
+
+import (
+    "os"
+    "github.com/humanjuan/golyn/lifecycle"
+)
+
+func init() {
+    id := os.Getenv("MY_MODULE_ID")
+    secret := os.Getenv("MY_MODULE_SECRET")
+    lifecycle.Register(id, secret, &MyModule{})
+}
+```
+
+### 3. Core Integration
+1. **Import your module**: In `golyn/cmd/golyn.go`, add a blank import to your register package:
+   ```go
+   import (
+       _ "github.com/your-user/example-ai/register"
+   )
+   ```
+2. **Configure the Core**: Update `web_server.conf` to authorize the module and use environment injection for the secret:
+   ```ini
+   [extensions]
+   enabled = true
+   example-ai = ${MY_MODULE_SECRET}
+   ```
+
+### 4. Running the Server
+Export the variables and start Golyn:
+```bash
+export MY_MODULE_ID="example-ai"
+export MY_MODULE_SECRET="super-secure-key"
+./golyn
+```
+
+---
 
 ### Built with Go
 The server is developed in **Golang** and, as part of its architecture, uses the following components:

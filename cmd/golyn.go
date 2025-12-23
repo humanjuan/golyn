@@ -39,7 +39,7 @@ const (
 
 func main() {
 	// RUN CLI COMMAND BASED ON FLAGS
-	exitCode, err, useFlag := cli.RunCLI()
+	exitCode, err, useFlag, noExtensions := cli.RunCLI()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(exitCode)
@@ -48,12 +48,15 @@ func main() {
 		os.Exit(exitCode)
 	}
 
+	lifecycle.NoExtensions = noExtensions
+
 	// LOAD CONFIG
 	conf, err := loaders.LoadConfig()
 	if err != nil {
 		panic(fmt.Sprintf("[ERROR] An error occurred while trying to load the server configuration. %v", err))
 	}
 	globals.SetConfig(conf)
+	lifecycle.Init()
 
 	// LOGGER
 	logApp, err := loaders.InitLog(strings.ToLower(conf.Server.Name), conf.Log.Path, conf.Log.Level, conf.Log.MaxSizeMb, conf.Log.MaxBackup)
@@ -152,9 +155,6 @@ func main() {
 	// START GIN FRAMEWORK
 	serverRouter := gin.Default()
 
-	// EXPOSE ROUTER TO GOLYN-AI
-	app.SetRouter(serverRouter)
-
 	// VIRTUAL HOSTS
 	globals.VirtualHosts = virtualhosts.Setup(serverRouter)
 	proxyMap := virtualhosts.BuildProxyHostMap(conf.Sites)
@@ -193,6 +193,7 @@ func main() {
 	routes.ConfigureRoutes(serverRouter, serverInfo, mainDomain, conf.Server.Dev)
 
 	// LIFECYCLE: OnStart hooks
+	lifecycle.NotifyRouterReady(serverRouter)
 	ctx := context.Background()
 
 	if err := lifecycle.Start(ctx); err != nil {

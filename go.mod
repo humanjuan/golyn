@@ -7,7 +7,7 @@ toolchain go1.25.0
 require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-ini/ini v1.67.0
-	github.com/humanjuan/acacia/v2 v2.3.0
+	github.com/humanjuan/acacia/v2 v2.3.1
 	github.com/humanjuan/golyn-ai v0.0.0-00010101000000-000000000000
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/patrickmn/go-cache v2.1.0+incompatible
@@ -19,6 +19,7 @@ require (
 	github.com/bytedance/sonic/loader v0.2.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 )
 
 require (
