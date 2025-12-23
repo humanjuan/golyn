@@ -85,12 +85,18 @@ type SMTP struct {
 	RateLimitRequests int
 }
 
+type Extensions struct {
+	Enabled   bool
+	Whitelist map[string]string
+}
+
 type Config struct {
-	Database Database
-	Server   Server
-	Sites    []SiteConfig
-	Cache    Cache
-	Log      Log
+	Database   Database
+	Server     Server
+	Sites      []SiteConfig
+	Cache      Cache
+	Log        Log
+	Extensions Extensions
 }
 
 func LoadConfig() (*Config, error) {
@@ -196,12 +202,34 @@ func LoadConfig() (*Config, error) {
 		return &Config{}, errors.New(fmt.Sprintf("A log directory is missing. Please create it manually."))
 	}
 
+	// Extensions Configuration
+	extSection := cfg.Section("extensions")
+	var extensions Extensions
+	extensions.Enabled, _ = extSection.Key("enabled").Bool()
+	extensions.Whitelist = make(map[string]string)
+	for _, key := range extSection.Keys() {
+		if key.Name() == "enabled" {
+			continue
+		}
+		val := key.String()
+		// Expand environment variables if format is ${VAR}
+		if len(val) > 3 && val[0:2] == "${" && val[len(val)-1] == '}' {
+			envVar := val[2 : len(val)-1]
+			expandedVal := os.Getenv(envVar)
+			if expandedVal != "" {
+				val = expandedVal
+			}
+		}
+		extensions.Whitelist[key.Name()] = val
+	}
+
 	return &Config{
-		Database: database,
-		Server:   server,
-		Sites:    sites,
-		Cache:    cache,
-		Log:      log,
+		Database:   database,
+		Server:     server,
+		Sites:      sites,
+		Cache:      cache,
+		Log:        log,
+		Extensions: extensions,
 	}, nil
 }
 
@@ -317,8 +345,19 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 
 	// SSL/TLS
 	tls_ssl.Cert, _, _ = CheckString(siteSettings.Key("cert_path"), false, sectionName, "cert_path")
+	if tls_ssl.Cert != "" && !filepath.IsAbs(tls_ssl.Cert) {
+		tls_ssl.Cert = filepath.Join(basePath, tls_ssl.Cert)
+	}
+
 	tls_ssl.Key, _, _ = CheckString(siteSettings.Key("key_path"), false, sectionName, "key_path")
+	if tls_ssl.Key != "" && !filepath.IsAbs(tls_ssl.Key) {
+		tls_ssl.Key = filepath.Join(basePath, tls_ssl.Key)
+	}
+
 	tls_ssl.Chain, _, _ = CheckString(siteSettings.Key("chain_path"), false, sectionName, "chain_path")
+	if tls_ssl.Chain != "" && !filepath.IsAbs(tls_ssl.Chain) {
+		tls_ssl.Chain = filepath.Join(basePath, tls_ssl.Chain)
+	}
 	security.TLS_SSL = tls_ssl
 
 	// SECURITY
