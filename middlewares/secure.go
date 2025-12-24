@@ -2,22 +2,23 @@ package middlewares
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/humanjuan/golyn/globals"
 	"github.com/humanjuan/golyn/internal/utils"
 	"github.com/unrolled/secure"
-	"net/http"
-	"strings"
 )
 
 func SecureMiddleware(isDev bool) gin.HandlerFunc {
 	log := globals.GetAppLogger()
 	log.Debug("SecureMiddleware()")
 	security := secure.New(secure.Options{
-		SSLRedirect:          false,
+		SSLRedirect:          true,
 		SSLTemporaryRedirect: false,
 		SSLProxyHeaders:      map[string]string{"X-Forwarded-Proto": "https"},
-		STSSeconds:           31536000,
+		STSSeconds:           63072000,
 		STSIncludeSubdomains: true,
 		STSPreload:           true,
 		FrameDeny:            true,

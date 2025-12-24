@@ -33,7 +33,7 @@ import (
 // Documentation: https://gin-gonic.com/docs/quickstart/
 
 const (
-	version    string = "v1.2.3"
+	version    string = "v1.3.0"
 	mainDomain string = "humanjuan.com"
 )
 
@@ -183,12 +183,14 @@ func main() {
 	}
 	serverRouter.Use(middlewares.LoggingMiddleware())
 	serverRouter.Use(middlewares.CustomErrorHandler())
-	serverRouter.Use(middlewares.CompressionMiddleware())
-	serverRouter.Use(virtualhosts.CreateDynamicProxyHandler(proxyMap))
+
 	serverRouter.Use(middlewares.SecureMiddleware(conf.Server.Dev))
 	serverRouter.Use(middlewares.RedirectOrAllowHostMiddleware())
 	serverRouter.Use(middlewares.CorsMiddleware(conf.Sites))
 	serverRouter.Use(middlewares.ClientCacheMiddleware(conf.Server.Dev))
+
+	serverRouter.Use(middlewares.CompressionMiddleware())
+	serverRouter.Use(virtualhosts.CreateDynamicProxyHandler(proxyMap))
 
 	routes.ConfigureRoutes(serverRouter, serverInfo, mainDomain, conf.Server.Dev)
 
