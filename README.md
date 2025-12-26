@@ -32,6 +32,10 @@ This server is currently **under active development** and continues to expand wi
 ### Secure and Configurable
 - Flexible configuration through `.conf` files for server-level and site-specific settings.
 - Security settings, including HTTPS redirection and cross-origin resource sharing (CORS) policies, ensure your sites remain protected and accessible.
+- **Content Security Policy (CSP)**:
+    - Default policy provides a high level of security while allowing common resources (CDN for jQuery, Tailwind, Google Fonts).
+    - **Base64 Support**: The default policy automatically allows `data:` schemes for `img-src` and `font-src`, preventing issues with embedded assets.
+    - **Per-Site Customization**: Each site can define its own `content_security_policy` in its `.conf` file to override the default server policy.
 - CSRF Protection: Built-in CSRF token generation and validation for forms and API endpoints.
 - Email Rate Limiting: Configurable request rate limiting per site and for email services.
 - TLS/SSL Management:
@@ -189,9 +193,29 @@ The Golyn Server operates as a centralized, multi-site server. Each site's setti
 - These files define:
     - Domain mappings (e.g., `golyn.local`, `humanjuan.com`).
     - Static file paths for assets, JavaScript and styles.
-    - Security settings like allowed origins and HTTPS enforcement.
+    - Security settings like allowed origins, HTTPS enforcement, and **Custom Content Security Policy**.
+    - SMTP configuration for emails.
+    - Reverse proxy settings.
 
-E.g., `golyn.conf` contains the settings of the principal Golyn server site, including its domain names and directories.
+#### Configuration Example (`portfolio.conf`):
+```ini
+[settings]
+enabled = true
+directory = portfolio
+domains = humanjuan.com, humanjuan.local
+
+# Security settings
+allow_origin = https://humanjuan.com, https://humanjuan.local
+enable_https_redirect = true
+# Optional: Override default CSP
+content_security_policy = default-src 'self'; img-src 'self' data:;
+
+# Mail SMTP settings
+smtp_host=mail.example.com
+smtp_port=587
+smtp_user=user@example.com
+smtp_password=${SMTP_PASS}
+```
 
 ---
 
