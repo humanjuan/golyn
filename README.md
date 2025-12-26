@@ -33,7 +33,7 @@ This server is currently **under active development** and continues to expand wi
 - Flexible configuration through `.conf` files for server-level and site-specific settings.
 - Security settings, including HTTPS redirection and cross-origin resource sharing (CORS) policies, ensure your sites remain protected and accessible.
 - **Content Security Policy (CSP)**:
-    - Default policy provides a high level of security while allowing common resources (CDN for jQuery, Tailwind, Google Fonts).
+    - Default policy provides a high level of security while allowing common resources (CDN for jQuery, Tailwind, Google Fonts, jsDelivr).
     - **Base64 Support**: The default policy automatically allows `data:` schemes for `img-src` and `font-src`, preventing issues with embedded assets.
     - **Per-Site Customization**: Each site can define its own `content_security_policy` in its `.conf` file to override the default server policy.
 - CSRF Protection: Built-in CSRF token generation and validation for forms and API endpoints.

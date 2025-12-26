@@ -28,11 +28,11 @@ func SecureMiddleware(isDev bool) gin.HandlerFunc {
 		IsDevelopment:        isDev,
 		ReferrerPolicy:       "strict-origin-when-cross-origin",
 		ContentSecurityPolicy: "default-src 'self'; " +
-			"script-src 'self' 'unsafe-inline' https://code.jquery.com https://cdn.tailwindcss.com; " +
-			"style-src 'self' 'unsafe-inline' https://stackpath.bootstrapcdn.com https://fonts.googleapis.com; " +
-			"font-src 'self' data: https://fonts.gstatic.com; " +
+			"script-src 'self' 'unsafe-inline' https://code.jquery.com https://cdn.tailwindcss.com https://cdn.jsdelivr.net; " +
+			"style-src 'self' 'unsafe-inline' https://stackpath.bootstrapcdn.com https://fonts.googleapis.com https://cdn.jsdelivr.net; " +
+			"font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; " +
 			"connect-src 'self' https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; " +
-			"img-src 'self' data: https://humanjuan.com https://www.humanjuan.com https://golyn.humanjuan.com;",
+			"img-src 'self' data: https://humanjuan.com https://www.humanjuan.com https://golyn.humanjuan.com https://cdn.jsdelivr.net;",
 	}
 
 	return func(c *gin.Context) {
