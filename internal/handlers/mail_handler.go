@@ -36,6 +36,7 @@ func SendmailHandler() gin.HandlerFunc {
 		var request SendMailRequest
 		if err := c.ShouldBind(&request); err != nil {
 			log.Error("SendmailHandler() | Invalid or unexpectedly formatted JSON provided in request body. %s", err.Error())
+			log.Sync()
 			err = fmt.Errorf("invalid or unexpectedly formatted JSON provided in request body")
 			c.Error(utils.NewHTTPError(http.StatusBadRequest, err.Error()))
 			return
@@ -47,6 +48,7 @@ func SendmailHandler() gin.HandlerFunc {
 		request.Message = utils.SanitizeInput(request.Message)
 		if request.Name == "" || request.Email == "" || request.Message == "" {
 			log.Error("SendmailHandler() | Invalid input after sanitization. %s", err.Error())
+			log.Sync()
 			err = fmt.Errorf("invalid input after sanitization")
 			c.Error(utils.NewHTTPError(http.StatusBadRequest, err.Error()))
 			return
@@ -92,6 +94,7 @@ func SendmailHandler() gin.HandlerFunc {
 
 		if err != nil {
 			log.Error("SendmailHandler() | Error decrypting password: %v", err.Error())
+			log.Sync()
 			err = fmt.Errorf("error decrypting password")
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
@@ -101,6 +104,7 @@ func SendmailHandler() gin.HandlerFunc {
 		client, err := smtp.Dial(addr)
 		if err != nil {
 			log.Error("SendmailHandler() | Failed to connect to SMTP: %v", err.Error())
+			log.Sync()
 			err = fmt.Errorf("failed to connect to SMTP")
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
@@ -109,6 +113,7 @@ func SendmailHandler() gin.HandlerFunc {
 
 		if err := client.StartTLS(tlsConfig); err != nil {
 			log.Error("SendmailHandler() | Failed to start TLS: %v", err.Error())
+			log.Sync()
 			err = fmt.Errorf("failed to start TLS")
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
@@ -116,6 +121,7 @@ func SendmailHandler() gin.HandlerFunc {
 
 		if err := client.Auth(auth); err != nil {
 			log.Error("SendmailHandler() | Failed to authenticate: %v", err.Error())
+			log.Sync()
 			err = fmt.Errorf("failed to authenticate")
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
@@ -123,6 +129,7 @@ func SendmailHandler() gin.HandlerFunc {
 
 		if err := client.Mail(from); err != nil {
 			log.Error("SendmailHandler() | Failed to set sender: %v", err.Error())
+			log.Sync()
 			err = fmt.Errorf("failed to set sender: %v", err)
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
@@ -130,6 +137,7 @@ func SendmailHandler() gin.HandlerFunc {
 
 		if err := client.Rcpt(to); err != nil {
 			log.Error("SendmailHandler() | Failed to set recipient: %v", err.Error())
+			log.Sync()
 			err = fmt.Errorf("failed to set recipient: %v", err)
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
@@ -138,6 +146,7 @@ func SendmailHandler() gin.HandlerFunc {
 		w, err := client.Data()
 		if err != nil {
 			log.Error("SendmailHandler() | Failed to send message: %v", err.Error())
+			log.Sync()
 			err = fmt.Errorf("failed to send message: %v", err)
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
@@ -146,6 +155,7 @@ func SendmailHandler() gin.HandlerFunc {
 		_, err = w.Write(message)
 		if err != nil {
 			log.Error("SendmailHandler() | Failed to write message: %v", err.Error())
+			log.Sync()
 			err = fmt.Errorf("failed to write message: %v", err)
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
@@ -153,6 +163,7 @@ func SendmailHandler() gin.HandlerFunc {
 
 		if err := w.Close(); err != nil {
 			log.Error("SendmailHandler() | Failed to close connection: %v", err.Error())
+			log.Sync()
 			err = fmt.Errorf("failed to close connection: %v", err)
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
@@ -160,6 +171,7 @@ func SendmailHandler() gin.HandlerFunc {
 
 		if err := client.Quit(); err != nil {
 			log.Error("SendmailHandler() | Failed to quit connection: %v", err.Error())
+			log.Sync()
 			err = fmt.Errorf("failed to quit connection: %v", err)
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return

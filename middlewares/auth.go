@@ -25,6 +25,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		headerParts := strings.Split(authHeader, " ")
 		if len(headerParts) != 2 || strings.ToLower(headerParts[0]) != "bearer" {
 			log.Error("AuthMiddleware() | Invalid token format | ClientIP: %s | Host: %v | User Agent: %s", clientIP, host, userAgent)
+			log.Sync()
 			err := fmt.Errorf("invalid Authorization header format. Format is `Authorization: Bearer {token}`")
 			c.Error(utils.NewHTTPError(http.StatusBadRequest, err.Error()))
 			c.Abort()
@@ -40,6 +41,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		if err != nil {
 			log.Error("AuthMiddleware() | Invalid token | ClientIP: %s | Host: %v | User Agent: %s | Error: %v",
 				clientIP, host, userAgent, err.Error())
+			log.Sync()
 			err = fmt.Errorf("invalid token")
 			c.Error(utils.NewHTTPError(http.StatusUnauthorized, err.Error()))
 			c.Abort()
@@ -51,6 +53,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			c.Next()
 		} else {
 			log.Error("AuthMiddleware() | Invalid token claims | ClientIP: %s | Host: %s | User Agent: %s", clientIP, host, userAgent)
+			log.Sync()
 			err = fmt.Errorf("invalid token claims")
 			c.Error(utils.NewHTTPError(http.StatusUnauthorized, err.Error()))
 			c.Abort()

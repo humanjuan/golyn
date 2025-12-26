@@ -28,7 +28,7 @@ func SecureMiddleware(isDev bool) gin.HandlerFunc {
 		IsDevelopment:        isDev,
 		ReferrerPolicy:       "strict-origin-when-cross-origin",
 		ContentSecurityPolicy: "default-src 'self'; " +
-			"script-src 'self' 'unsafe-inline' https://code.jquery.com https://cdn.tailwindcss.com https://cdn.jsdelivr.net; " +
+			"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://code.jquery.com https://cdn.tailwindcss.com https://cdn.jsdelivr.net; " +
 			"style-src 'self' 'unsafe-inline' https://stackpath.bootstrapcdn.com https://fonts.googleapis.com https://cdn.jsdelivr.net; " +
 			"font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; " +
 			"connect-src 'self' https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; " +
@@ -76,6 +76,7 @@ func SecureMiddleware(isDev bool) gin.HandlerFunc {
 		if c.Request.TLS != nil && (isInvalid || !hasCert) {
 			err := fmt.Sprintf("no valid certificate found | Host: %s", host)
 			log.Error("secureMiddleware() | No valid certificate for HTTPS request | Host: %s | Path: %s | Error: %v", host, c.Request.URL.Path, err)
+			log.Sync()
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err))
 			c.Abort()
 			return
@@ -85,6 +86,7 @@ func SecureMiddleware(isDev bool) gin.HandlerFunc {
 		err := security.Process(c.Writer, c.Request)
 		if err != nil {
 			log.Error("secureMiddleware() | An internal server error occurred while processing security. | Error: %v", err.Error())
+			log.Sync()
 			err = fmt.Errorf("an internal server error occurred while processing security")
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			c.Abort()

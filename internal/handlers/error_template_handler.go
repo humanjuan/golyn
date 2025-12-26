@@ -15,6 +15,7 @@ func LoadErrorTemplate(templateDir string) error {
 	log.Debug("LoadErrorTemplate()")
 	if err != nil {
 		log.Error("LoadErrorTemplate() | Failed to get base path | Error: %v", err.Error())
+		log.Sync()
 		return err
 	}
 	fullPath := filepath.Join(basePath, templateDir, "error.html")
@@ -25,10 +26,12 @@ func LoadErrorTemplate(templateDir string) error {
 
 	if parseErr != nil {
 		log.Error("LoadErrorTemplate() | Failed to parse template | Path: %s | Error: %v", fullPath, parseErr.Error())
+		log.Sync()
 		return parseErr
 	}
 	if globals.ErrorTemplate == nil {
 		log.Error("LoadErrorTemplate() | No templates found | Path: %s", fullPath)
+		log.Sync()
 		return fmt.Errorf("no templates found at %s", fullPath)
 	}
 	log.Debug("LoadErrorTemplate() | Template loaded successfully | Path: %s", fullPath)

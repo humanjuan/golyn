@@ -113,6 +113,7 @@ func LoadAllCertificates(sites []loaders.SiteConfig) error {
 			cert, err = tls.LoadX509KeyPair(site.Security.TLS_SSL.Cert, site.Security.TLS_SSL.Key)
 			if err != nil {
 				log.Error("loadAllCertificates() | Failed to load SSL certificate. Fallback to HTTP only | Site: %s | Error: %v", site.Directory, err.Error())
+				log.Sync()
 				globals.InvalidCertificates[domain] = true
 				continue
 			}
@@ -144,6 +145,7 @@ func LoadAllCertificates(sites []loaders.SiteConfig) error {
 			certs, err := x509.ParseCertificates(cert.Certificate[0])
 			if err != nil {
 				log.Error("loadAllCertificates() | Failed to parse certificate. Fallback to HTTP only | Site: %s | Error: %v", site.Directory, err.Error())
+				log.Sync()
 				globals.InvalidCertificates[domain] = true
 				continue
 			}

@@ -83,6 +83,7 @@ func main() {
 
 	if err = dbInstance.InitDB(&conf.Database, logApp); err != nil {
 		logDB.Error("main() | An error occurred while establishing the connection to the database. | Error: %v", err.Error())
+		logDB.Sync()
 	}
 	defer dbInstance.Close()
 
@@ -92,6 +93,7 @@ func main() {
 	globals.InitCertificates()
 	if err = internal.LoadAllCertificates(conf.Sites); err != nil {
 		logApp.Error("main() | An error has occurred while loading certificates. | Error: %v", err.Error())
+		logApp.Sync()
 	}
 
 	logApp.Debug("main() | globals.InvalidCertificates: %v", globals.InvalidCertificates)
@@ -100,6 +102,7 @@ func main() {
 	publicIP, localIP, err := utils.GetIPAddresses()
 	if err != nil {
 		logApp.Error("main() | An error occurred while fetching the public IP address. Error: %v", err.Error())
+		logApp.Sync()
 	}
 
 	logApp.Info("main() | Dev mode: %t | Server Name: %s | Server port: %d | Local IP: %s | Public IP: %s",
@@ -200,6 +203,7 @@ func main() {
 
 	if err := lifecycle.Start(ctx); err != nil {
 		logApp.Error("main() | lifecycle start failed: %v", err)
+		logApp.Sync()
 		os.Exit(1)
 	}
 
@@ -214,6 +218,7 @@ func main() {
 	serverHTTP, err := internal.SetupServerHTTP(serverRouter)
 	if err != nil {
 		logApp.Error("main() | An error has occurred while trying to configure the HTTP server. | Error: %v", err.Error())
+		logApp.Sync()
 		panic(err.Error())
 	}
 	logApp.Info("main() | Server HTTP to redirect it's Up on port 80")
@@ -234,6 +239,7 @@ func main() {
 			err := serverHTTPS.ListenAndServeTLS("", "")
 			if err != nil && !errors.Is(err, http.ErrServerClosed) {
 				logApp.Error("main() | An error has occurred while trying to start the HTTPS server. | Error: %v", err.Error())
+				logApp.Sync()
 				os.Exit(1)
 			}
 		}()
@@ -247,6 +253,7 @@ func main() {
 		defer wg.Done()
 		if serverHTTP == nil {
 			logApp.Error("main() | serverHTTP is nil in HTTP server goroutine")
+			logApp.Sync()
 			os.Exit(1)
 			return
 		}
@@ -254,6 +261,7 @@ func main() {
 		err = serverHTTP.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logApp.Error("main() | An error has occurred while trying to start the HTTP server. | Error: %v", err.Error())
+			logApp.Sync()
 			os.Exit(1)
 		}
 	}()

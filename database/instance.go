@@ -27,12 +27,14 @@ func (dbi *DBInstance) InitDB(config *loaders.Database, log *acacia.Log) error {
 
 	if err != nil {
 		log.Error("Unable to connect to database. %w", err.Error())
+		log.Sync()
 		return err
 	}
 
 	err = dbi.db.Ping(context.Background())
 	if err != nil {
 		log.Error("The Database it doesn't available. %w", err.Error())
+		log.Sync()
 		return err
 	}
 
@@ -41,6 +43,7 @@ func (dbi *DBInstance) InitDB(config *loaders.Database, log *acacia.Log) error {
 	err = dbi.db.QueryRow(context.Background(), sqlStatement).Scan(&version)
 	if err != nil {
 		log.Error("An error occurred while trying to get the version from the database: %w", err.Error())
+		log.Sync()
 		return err
 	}
 

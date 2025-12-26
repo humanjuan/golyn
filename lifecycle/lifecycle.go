@@ -58,6 +58,7 @@ func Register(id string, secret string, h Hook) error {
 		if !ok || expectedSecret != secret {
 			if log != nil {
 				log.Error("[CRITICAL] Unauthorized extension attempt | id=%s", id)
+				log.Sync()
 			}
 			return fmt.Errorf("unauthorized extension: %s", id)
 		}
@@ -113,6 +114,7 @@ func Init() {
 			} else {
 				if log != nil {
 					log.Error("[CRITICAL] Unauthorized extension found during init | id=%s", rh.id)
+					log.Sync()
 				}
 			}
 		}
@@ -148,6 +150,7 @@ func Start(ctx context.Context) error {
 					rh.hook,
 					err,
 				)
+				log.Sync()
 			}
 			return err
 		}
@@ -190,6 +193,7 @@ func Shutdown(ctx context.Context) {
 					rh.hook,
 					err,
 				)
+				log.Sync()
 			}
 		}
 	}

@@ -21,6 +21,7 @@ func Version(serverInfo *app.Info) gin.HandlerFunc {
 		certPEM, err := os.ReadFile(serverInfo.CertificatePath)
 		if err != nil {
 			log.Error("version() | An error has occurred while trying to read the certificate | Path: %s | Error: %v", serverInfo.CertificatePath, err.Error())
+			log.Sync()
 			err = fmt.Errorf("an error has occurred while trying to read the certificate")
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
@@ -29,6 +30,7 @@ func Version(serverInfo *app.Info) gin.HandlerFunc {
 		block, _ := pem.Decode(certPEM)
 		if block == nil {
 			log.Error("version() | An error has occurred while trying to decode PEM certificate | Path: %s | Error: %v", serverInfo.CertificatePath, err.Error())
+			log.Sync()
 			err = fmt.Errorf("an error has occurred while trying to decode PEM certificate")
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
@@ -37,6 +39,7 @@ func Version(serverInfo *app.Info) gin.HandlerFunc {
 		cert, err := x509.ParseCertificate(block.Bytes)
 		if err != nil {
 			log.Error("version() | An error has occurred while trying to parse the certificate bytes | Path: %s | Error: %v", serverInfo.CertificatePath, err.Error())
+			log.Sync()
 			err = fmt.Errorf("an error has occurred while trying to parse the certificate bytes")
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
