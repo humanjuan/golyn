@@ -26,9 +26,10 @@ type TLS_SSL struct {
 }
 
 type Security struct {
-	AllowOrigin   []string
-	HTTPSRedirect bool
-	TLS_SSL       TLS_SSL
+	AllowOrigin           []string
+	HTTPSRedirect         bool
+	ContentSecurityPolicy string
+	TLS_SSL               TLS_SSL
 }
 type SiteConfig struct {
 	Enabled     bool
@@ -363,6 +364,7 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 	// SECURITY
 	security.AllowOrigin = siteSettings.Key("allow_origin").Strings(",")
 	security.HTTPSRedirect, _ = siteSettings.Key("enable_https_redirect").Bool()
+	security.ContentSecurityPolicy = siteSettings.Key("content_security_policy").String()
 	siteConfig.Security = security
 
 	// SMTP

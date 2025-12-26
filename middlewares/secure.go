@@ -14,7 +14,8 @@ import (
 func SecureMiddleware(isDev bool) gin.HandlerFunc {
 	log := globals.GetAppLogger()
 	log.Debug("SecureMiddleware()")
-	security := secure.New(secure.Options{
+
+	baseOptions := secure.Options{
 		SSLRedirect:          true,
 		SSLTemporaryRedirect: false,
 		SSLProxyHeaders:      map[string]string{"X-Forwarded-Proto": "https"},
@@ -29,14 +30,27 @@ func SecureMiddleware(isDev bool) gin.HandlerFunc {
 		ContentSecurityPolicy: "default-src 'self'; " +
 			"script-src 'self' 'unsafe-inline' https://code.jquery.com https://cdn.tailwindcss.com; " +
 			"style-src 'self' 'unsafe-inline' https://stackpath.bootstrapcdn.com https://fonts.googleapis.com; " +
-			"font-src 'self' https://fonts.gstatic.com; " +
+			"font-src 'self' data: https://fonts.gstatic.com; " +
 			"connect-src 'self' https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; " +
 			"img-src 'self' data: https://humanjuan.com https://www.humanjuan.com https://golyn.humanjuan.com;",
-	})
+	}
 
 	return func(c *gin.Context) {
 		hostParts := strings.Split(c.Request.Host, ":")
 		host := hostParts[0]
+
+		// Get per-site security config if available
+		virtualHosts := globals.VirtualHosts
+		var siteCSP string
+		if vh, ok := virtualHosts[host]; ok {
+			siteCSP = vh.Security.ContentSecurityPolicy
+		}
+
+		options := baseOptions
+		if siteCSP != "" {
+			options.ContentSecurityPolicy = siteCSP
+		}
+		security := secure.New(options)
 
 		// Verify valid certificate
 		globals.CertMutex.RLock()
