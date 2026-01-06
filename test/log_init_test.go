@@ -1,3 +1,22 @@
+/*
+Package test provides integration and regression tests for the Golyn project.
+
+log_init_test.go: Logger Initialization Tests
+
+This test ensures that the logging system (using the Acacia library) is
+correctly initialized and that the log files are created in the expected locations.
+
+1. Test Objectives:
+  - App Logger Init: Verify that InitLog creates the application server log file.
+  - DB Logger Init: Verify that InitLogDB creates the database-specific log file.
+
+2. Expected Results:
+  - Logger instances are returned without errors.
+  - Physical log files exist on the disk after initialization.
+
+3. Execution:
+  - Command: go test -v test/log_init_test.go
+*/
 package test
 
 import (

@@ -3,12 +3,13 @@ package loaders
 import (
 	"errors"
 	"fmt"
-	"github.com/humanjuan/golyn/internal/utils"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"sync"
+
+	"github.com/humanjuan/golyn/internal/utils"
 
 	"github.com/go-ini/ini"
 )
@@ -64,6 +65,7 @@ type Server struct {
 	AutoJWT                    bool
 	TokenExpirationTime        int
 	TokenExpirationRefreshTime int
+	JWTSecret                  string
 }
 
 type Cache struct {
@@ -129,6 +131,14 @@ func LoadConfig() (*Config, error) {
 	database.Schema = dbSection.Key("schema").String()
 	database.Username = dbSection.Key("username").String()
 	database.Password = dbSection.Key("password").String()
+	// Expand environment variables if format is ${VAR}
+	if len(database.Password) > 3 && database.Password[0:2] == "${" && database.Password[len(database.Password)-1] == '}' {
+		envVar := database.Password[2 : len(database.Password)-1]
+		expandedVal := os.Getenv(envVar)
+		if expandedVal != "" {
+			database.Password = expandedVal
+		}
+	}
 
 	// Server Configuration
 	serverSection := cfg.Section("server")
@@ -143,6 +153,17 @@ func LoadConfig() (*Config, error) {
 	server.AutoJWT, _ = serverSection.Key("autoJWT").Bool()
 	server.TokenExpirationTime, _ = serverSection.Key("tokenExpirationTime").Int()
 	server.TokenExpirationRefreshTime, _ = serverSection.Key("tokenExpirationRefreshTime").Int()
+
+	// JWT Secret with environment variable support
+	jwtSecret := serverSection.Key("jwtSecret").String()
+	if len(jwtSecret) > 3 && jwtSecret[0:2] == "${" && jwtSecret[len(jwtSecret)-1] == '}' {
+		envVar := jwtSecret[2 : len(jwtSecret)-1]
+		expandedVal := os.Getenv(envVar)
+		if expandedVal != "" {
+			jwtSecret = expandedVal
+		}
+	}
+	server.JWTSecret = jwtSecret
 
 	if !filepath.IsAbs(server.SitesRootPath) {
 		server.SitesRootPath = filepath.Join(basePath, server.SitesRootPath)

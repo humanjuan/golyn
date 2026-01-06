@@ -1,3 +1,23 @@
+/*
+Package test provides integration and regression tests for the Golyn project.
+
+file_utils_test.go: File System Utility Tests
+
+This test verifies the basic file system utilities used by the server to
+detect the presence of files and directories.
+
+1. Test Objectives:
+  - Directory Detection: Confirm that existing directories are detected.
+  - File Detection: Confirm that created files are recognized.
+  - Negative Detection: Ensure that non-existent paths are correctly reported.
+
+2. Expected Results:
+  - utils.FileOrDirectoryExists returns true for valid temporary paths.
+  - utils.FileOrDirectoryExists returns false for invalid paths.
+
+3. Execution:
+  - Command: go test -v test/file_utils_test.go
+*/
 package test
 
 import (

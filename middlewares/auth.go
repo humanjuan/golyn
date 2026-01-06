@@ -5,13 +5,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/humanjuan/golyn/globals"
+	platjwt "github.com/humanjuan/golyn/internal/security/jwt"
 	"github.com/humanjuan/golyn/internal/utils"
 	"net/http"
 	"strings"
 )
-
-// openssl rand -base64 32
-var jwtKey = []byte("x5qFH80ULkKFOBiZnYhW/v2u8sWI5F3ro1wOEE5gm0I=")
 
 func AuthMiddleware() gin.HandlerFunc {
 	log := globals.GetAppLogger()
@@ -34,8 +32,9 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		tokenString := headerParts[1]
 
-		token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
-			return jwtKey, nil
+		claims := &platjwt.Claims{}
+		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+			return platjwt.GetJWTKey(), nil
 		})
 
 		if err != nil {
@@ -48,8 +47,9 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		if claims, ok := token.Claims.(*jwt.RegisteredClaims); ok && token.Valid {
-			c.Set("username", claims.Subject)
+		if claims, ok := token.Claims.(*platjwt.Claims); ok && token.Valid {
+			c.Set("subject", claims.Subject)
+			c.Set("site_id", claims.SiteID)
 			c.Next()
 		} else {
 			log.Error("AuthMiddleware() | Invalid token claims | ClientIP: %s | Host: %s | User Agent: %s", clientIP, host, userAgent)

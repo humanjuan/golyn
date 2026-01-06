@@ -7,18 +7,18 @@ import (
 )
 
 type Token struct {
-	ID        string
+	ID        int64
+	UserID    string
 	Token     string
-	Username  string
 	IssuedAt  time.Time
 	ExpiresAt time.Time
-	Status    bool
+	Revoked   bool
 }
 
-func (dbi *DBInstance) StoreRefreshToken(refreshToken, username string, expiresAt time.Time) error {
-	query := `INSERT INTO golyn.refresh_tokens (token, username, issued_at, expires_at, status) VALUES ($1, $2, NOW(), $3, true)`
+func (dbi *DBInstance) StoreRefreshToken(refreshToken, userID string, expiresAt time.Time) error {
+	query := `INSERT INTO auth.refresh_tokens (token, user_id, issued_at, expires_at, revoked) VALUES ($1, $2, NOW(), $3, false)`
 
-	_, err := dbi.db.Exec(context.Background(), query, refreshToken, username, expiresAt)
+	_, err := dbi.db.Exec(context.Background(), query, refreshToken, userID, expiresAt)
 	if err != nil {
 		return fmt.Errorf("unable to store refresh token: %w", err)
 	}
@@ -29,10 +29,10 @@ func (dbi *DBInstance) StoreRefreshToken(refreshToken, username string, expiresA
 func (dbi *DBInstance) GetRefreshToken(tokenValue string) (*Token, error) {
 	var token Token
 
-	query := `SELECT id, token, status, expires_at FROM golyn.refresh_tokens WHERE token = $1`
+	query := `SELECT id, token, user_id, revoked, expires_at FROM auth.refresh_tokens WHERE token = $1`
 
 	row := dbi.db.QueryRow(context.Background(), query, tokenValue)
-	err := row.Scan(&token.ID, &token.Username, &token.Status, &token.ExpiresAt)
+	err := row.Scan(&token.ID, &token.Token, &token.UserID, &token.Revoked, &token.ExpiresAt)
 
 	if err != nil {
 		if err.Error() == "no rows in result set" {
@@ -44,12 +44,23 @@ func (dbi *DBInstance) GetRefreshToken(tokenValue string) (*Token, error) {
 	return &token, nil
 }
 
-func (dbi *DBInstance) RevokeRefreshToken(username string) error {
-	query := `UPDATE golyn.refresh_tokens SET status = false WHERE username = $1`
+func (dbi *DBInstance) RevokeAllUserRefreshTokens(userID string) error {
+	query := `UPDATE auth.refresh_tokens SET revoked = true WHERE user_id = $1`
 
-	_, err := dbi.db.Exec(context.Background(), query, username)
+	_, err := dbi.db.Exec(context.Background(), query, userID)
 	if err != nil {
-		return fmt.Errorf("unable to revoke refresh token: %v", err)
+		return fmt.Errorf("unable to revoke refresh tokens for user: %v", err)
+	}
+
+	return nil
+}
+
+func (dbi *DBInstance) RevokeRefreshTokenByID(id int64) error {
+	query := `UPDATE auth.refresh_tokens SET revoked = true WHERE id = $1`
+
+	_, err := dbi.db.Exec(context.Background(), query, id)
+	if err != nil {
+		return fmt.Errorf("unable to revoke refresh token by id: %v", err)
 	}
 
 	return nil

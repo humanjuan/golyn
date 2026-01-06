@@ -85,72 +85,235 @@ Golyn features a robust, secure, and orchestrated extension system that allows e
 
 ---
 
-## Extension Integration Guide
+## Platform JWT (Golyn Identity Contract)
 
-If you want to create or integrate a new module (e.g., `example-ai`), follow these steps:
+Golyn uses a standardized JWT (JSON Web Token) contract to manage identity and context across the entire platform. This contract ensures that any module (HR, AI, or future products) can trust the token without knowing Golyn's internal logic.
 
-### 1. Implement the Lifecycle Hooks
-Your module must implement the `lifecycle.Hook` interface and optionally `lifecycle.RouterHook`.
+### JWT Platform Contract
+
+The tokens issued by Golyn follow a minimal and strict claim structure:
+
+| Claim | Source | Description |
+| :--- | :--- | :--- |
+| `sub` | Registered | **Subject**: Stable identity of the user (e.g., username or UUID). |
+| `site_id` | Custom | **Tenant/Organization**: Context where the user is operating. |
+| `iat` | Registered | **Issued At**: Token generation timestamp. |
+| `exp` | Registered | **Expiration**: Security boundary for token validity. |
+| `iss` | Registered | **Issuer**: Always set to `"Golyn"`. |
+| `aud` | Registered | **Audience**: Destination validation, set to `"GolynPlatform"`. |
+
+> **Important**: Domain-specific data (roles, permissions, hierarchies) are **prohibited** within the Golyn JWT. The token identifies *who* and *where*, not the business rules.
+
+### Identity Model
+- **Subject (`sub`)**: This is the primary key for user identification. In Golyn, while it usually contains the username/email, it should be treated as an opaque stable identifier by consuming modules.
+- **Site Context (`site_id`)**: Enables true multi-tenant support. Every token is bound to a specific site (extracted from the request host during login).
+
+### Token Lifecycle
+
+Golyn implements a dual-token rotation system for security:
+
+1.  **Access Token**: Short-lived token used for every request.
+2.  **Refresh Token**: Long-lived token used to obtain new Access Tokens. It is stored in a secure, HttpOnly cookie.
+3.  **Automatic Revocation**: When a new session is created or a token is refreshed, old tokens are invalidated in the database to prevent replay attacks.
+
+### Configuration
+
+Security secrets must be defined via environment variables:
+
+```ini
+# config/server/web_server.conf
+[server]
+tokenExpirationTime = 5         # Minutes
+tokenExpirationRefreshTime = 1440 # Minutes (24h)
+jwtSecret = ${GOLYN_JWT_SECRET}
+```
+
+### Usage for Developers
+
+#### 1. Protecting Routes (Middleware)
+Use the `AuthMiddleware()` to protect any Gin router group. It automatically validates the token and sets the `subject` and `site_id` in the context.
 
 ```go
-type MyModule struct {}
-
-func (m *MyModule) OnStart(ctx context.Context) error {
-    // Initialization logic
-    return nil
-}
-
-func (m *MyModule) OnShutdown(ctx context.Context) error {
-    // Cleanup logic
-    return nil
-}
-
-func (m *MyModule) OnRouterReady(group *gin.RouterGroup) {
-    // Register your routes here
-    // Base path: /api/v1/extension/{your-id}/
-    group.GET("/status", handleStatus)
+private := router.Group("/api/v1/private")
+private.Use(middlewares.AuthMiddleware())
+{
+    private.GET("/data", func(c *gin.Context) {
+        subject := c.GetString("subject")
+        siteID := c.GetString("site_id")
+        // Your logic here
+    })
 }
 ```
 
-### 2. Auto-Registration
-Create a `register` package in your module that uses environment variables for identity:
+#### 2. Manual Token Validation
+If you are building an external service or a standalone extension, you can validate tokens using the `internal/security/jwt` package:
 
 ```go
-package register
+import platjwt "github.com/humanjuan/golyn/internal/security/jwt"
 
-import (
-    "os"
-    "github.com/humanjuan/golyn/lifecycle"
-)
-
-func init() {
-    id := os.Getenv("MY_MODULE_ID")
-    secret := os.Getenv("MY_MODULE_SECRET")
-    lifecycle.Register(id, secret, &MyModule{})
+claims, err := platjwt.ValidateRefreshToken(tokenString)
+if err == nil {
+    fmt.Println("User:", claims.Subject)
+    fmt.Println("Site:", claims.SiteID)
 }
 ```
 
-### 3. Core Integration
-1. **Import your module**: In `golyn/cmd/golyn.go`, add a blank import to your register package:
-   ```go
-   import (
-       _ "github.com/your-user/example-ai/register"
-   )
-   ```
-2. **Configure the Core**: Update `web_server.conf` to authorize the module and use environment injection for the secret:
-   ```ini
-   [extensions]
-   enabled = true
-   example-ai = ${MY_MODULE_SECRET}
-   ```
+---
 
-### 4. Running the Server
-Export the variables and start Golyn:
-```bash
-export MY_MODULE_ID="example-ai"
-export MY_MODULE_SECRET="super-secure-key"
-./golyn
+## Frontend Integration (TypeScript Example)
+
+This example shows how to interact with the Golyn JWT system from a TypeScript frontend. It handles the dual-token system: Access Token (in memory/local storage) and Refresh Token (secure HttpOnly cookie).
+
+### GolynAuthService.ts
+
+```typescript
+/**
+ * Golyn Authentication Service
+ * Handles login, authenticated requests, and automatic token refresh.
+ */
+
+interface LoginResponse {
+  message: string;
+  data: string; // Serialized User object
+  access_token: string;
+}
+
+interface RefreshResponse {
+  access_token: string;
+}
+
+class GolynAuthService {
+  private static API_BASE = "https://your-golyn-domain.com/api/v1";
+  private static accessToken: string | null = null;
+
+  /**
+   * Login to Golyn.
+   * The server will set a 'refreshToken' HttpOnly cookie automatically.
+   */
+  static async login(username: string, password: string): Promise<LoginResponse> {
+    const response = await fetch(`${this.API_BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Login failed: ${response.statusText}`);
+    }
+
+    const result: LoginResponse = await response.json();
+    this.accessToken = result.access_token;
+    
+    // Store access token in memory or sessionStorage (don't use localStorage for JWT if possible)
+    return result;
+  }
+
+  /**
+   * Refreshes the Access Token using the Refresh Token stored in the cookie.
+   * Requires 'credentials: include' to send the HttpOnly cookie.
+   */
+  static async refreshToken(): Promise<string> {
+    const response = await fetch(`${this.API_BASE}/refresh_token`, {
+      method: 'POST',
+      credentials: 'include', // Crucial to send the refreshToken cookie
+    });
+
+    if (!response.ok) {
+      this.accessToken = null;
+      throw new Error("Session expired. Please login again.");
+    }
+
+    const result: RefreshResponse = await response.json();
+    this.accessToken = result.access_token;
+    return this.accessToken;
+  }
+
+  /**
+   * Wrapper for authenticated fetch requests.
+   * Automatically handles 401 Unauthorized by attempting to refresh the token once.
+   */
+  static async authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+    if (!this.accessToken) {
+      // Try to refresh if we don't have an access token in memory
+      try {
+        await this.refreshToken();
+      } catch (e) {
+        throw new Error("Authentication required");
+      }
+    }
+
+    // Set Authorization header
+    const headers = {
+      ...options.headers,
+      'Authorization': `Bearer ${this.accessToken}`
+    };
+
+    let response = await fetch(url, { ...options, headers });
+
+    // If 401, the access token might have expired. Try to refresh.
+    if (response.status === 401) {
+      try {
+        const newAccessToken = await this.refreshToken();
+        // Retry the request with the new token
+        const retryHeaders = {
+          ...options.headers,
+          'Authorization': `Bearer ${newAccessToken}`
+        };
+        response = await fetch(url, { ...options, headers: retryHeaders });
+      } catch (err) {
+        // Refresh failed, user must login again
+        window.location.href = "/login";
+        throw new Error("Session expired");
+      }
+    }
+
+    return response;
+  }
+
+  /**
+   * Logout.
+   * Note: Golyn revokes tokens on new logins, but you should clear local state.
+   */
+  static logout(): void {
+    this.accessToken = null;
+    // For a full logout, you'd typically call a logout endpoint 
+    // that clears the refreshToken cookie via Set-Cookie header.
+    document.cookie = "refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    window.location.href = "/login";
+  }
+}
+
+// Usage Example:
+// 1. Login
+// await GolynAuthService.login("user@example.com", "password123");
+//
+// 2. Fetch Protected Data
+// const response = await GolynAuthService.authenticatedFetch("https://your-golyn-domain.com/api/v1/zzzz");
+// const logs = await response.json();
 ```
+
+---
+
+### Developer Tools (Database & Client Management)
+
+For local development, Golyn provides a set of scripts to manage the infrastructure and multi-site data without manually writing SQL.
+
+#### 1. Infrastructure Management (`manage_db.sh`)
+Located in `docker/postgresql/`, this script handles the Docker container lifecycle.
+- `./manage_db.sh start`: Launches the PostgreSQL container.
+- `./manage_db.sh stop`: Stops the container.
+- `./manage_db.sh logs`: Follows the database logs.
+- `./manage_db.sh cli-golyn`: Opens an interactive `psql` shell directly in the `golyn` database.
+- `./manage_db.sh clean`: **Warning**: Deletes the container and all persistent data.
+
+#### 2. Multi-site Administration (`manage_clients.sh`)
+This tool manages tenants (sites) and users. You can also access it via `./manage_db.sh clients`.
+- `./manage_db.sh clients list`: Shows all registered sites and users.
+- `./manage_db.sh clients add-site <key> <host>`: Registers a new site (e.g., `hr-site hr.local`).
+- `./manage_db.sh clients add-user <site_key> <username> <password>`: Creates a user for a specific site.
+- **Automatic Hashing**: The script automatically detects if the password is plain text and hashes it using the Golyn binary before storing it in the database.
+
+> **Note on Docker**: The provided Docker configurations are intended for **development only**. Choosing the final production database (PostgreSQL, RDS, etc.) and the orchestration layer (Docker, Kubernetes, or bare metal) is the responsibility of the implementer. Golyn is designed to be infrastructure-agnostic.
 
 ---
 

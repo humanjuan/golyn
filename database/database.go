@@ -6,8 +6,6 @@ import (
 	"reflect"
 )
 
-// improve this implementation (Select)
-
 func (dbi *DBInstance) Select(query string, result interface{}, args ...interface{}) error {
 	// Execute SQL query with optional arguments ($n)
 	rows, err := dbi.db.Query(context.Background(), query, args...)
@@ -16,27 +14,27 @@ func (dbi *DBInstance) Select(query string, result interface{}, args ...interfac
 	}
 	defer rows.Close()
 
-	// Check if 'result' is a pointer to struct or structs slice
+	// Ensure 'result' is a pointer to a slice of structs
 	v := reflect.ValueOf(result)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Slice {
 		return errors.New("'result' must be a pointer to a struct slice")
 	}
 
-	// Obtain type of element of the slice. Equivalent to reflect.TypeOf(Country{})
+	// Get the type of the slice elements (e.g., Country{})
 	elemType := v.Elem().Type().Elem()
 
-	// Create an empty map for mapping column or field names in the structure
+	// Map database column names to struct field indices
 	colMap := make(map[string]int)
 	for i := 0; i < elemType.NumField(); i++ {
-		colName := elemType.Field(i).Tag.Get("db") // Column name in the database
+		colName := elemType.Field(i).Tag.Get("db") // Column name defined in 'db' tag
 		colMap[colName] = i
 	}
 
 	for rows.Next() {
-		// Create a  new vale of struct. Is the same item := country{}
+		// Create a new instance of the struct (item := country{})
 		item := reflect.New(elemType).Elem()
 
-		// Create an interface for each column in the row
+		// Map row values to struct fields
 		values := make([]interface{}, len(colMap))
 		for _, colIndex := range colMap {
 			values[colIndex] = item.Field(colIndex).Addr().Interface()
@@ -46,7 +44,7 @@ func (dbi *DBInstance) Select(query string, result interface{}, args ...interfac
 			return err
 		}
 
-		// Add the struct to result (slice of structures). V is a pointer to struct.
+		// Append the populated struct to the result slice
 		v.Elem().Set(reflect.Append(v.Elem(), item))
 	}
 

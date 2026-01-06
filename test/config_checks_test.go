@@ -1,3 +1,25 @@
+/*
+Package test provides integration and regression tests for the Golyn project.
+
+config_checks_test.go: Configuration Loader Validation
+
+This test validates the helper functions used to parse and validate settings
+from .conf files (ini format). It ensures that types are correctly handled
+and that mandatory fields are enforced.
+
+1. Test Objectives:
+  - String Validation: Check that mandatory strings are required and optional ones default to empty.
+  - Integer Validation: Verify numeric parsing and handling of missing or invalid values.
+  - Boolean Validation: Ensure true/false/missing flags are interpreted correctly.
+
+2. Expected Results:
+  - Mandatory fields return an error if missing or empty.
+  - Optional fields return default values (empty string, 0, or false) if missing.
+  - Correct types are returned for valid input.
+
+3. Execution:
+  - Command: go test -v test/config_checks_test.go
+*/
 package test
 
 import (
