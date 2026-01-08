@@ -42,6 +42,7 @@ builds/*.gz
 /pkg/sumdb/
 .idea/
 .DS_Store
+**/.DS_Store
 /certificates/portfolio/
 /certificates/golyn/
 /certificates/kayak/
