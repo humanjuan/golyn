@@ -30,7 +30,7 @@ import (
 func TestInitLogCreatesFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	log, err := loaders.InitLog("app", tmpDir, "info", 5, 2)
+	log, err := loaders.InitLog("app", tmpDir, "info", 5, 2, true)
 	if err != nil {
 		t.Fatalf("InitLog returned error: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestInitLogCreatesFiles(t *testing.T) {
 func TestInitLogDBCreatesFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	log, err := loaders.InitLogDB("app", tmpDir, "debug", 10, 3)
+	log, err := loaders.InitLogDB("app", tmpDir, "debug", 10, 3, true)
 	if err != nil {
 		t.Fatalf("InitLogDB returned error: %v", err)
 	}

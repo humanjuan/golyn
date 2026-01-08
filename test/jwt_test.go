@@ -24,6 +24,8 @@ It ensures that the security contract is respected across the following stages:
   - Accessing after 61 seconds (token expiration) returns 401 Unauthorized.
   - Refreshing the token returns a new valid JWT.
   - Teardown successfully removes the test user from the database.
+  - OAuth2 Multi-provider: Supports Azure, Google, and GitHub.
+  - Identity Mapping: Automatic linking of external identities to existing users.
 
 4. Execution:
   - Command: export $(grep -v '^#' .env | xargs) && go test -v test/jwt_test.go
