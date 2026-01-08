@@ -168,6 +168,29 @@ Golyn includes a protected API for platform management, allowing administrators 
 | `/users` | `POST` | **Create User**: Add a user to a site (requires `site_key`, `username`, `password`). |
 | `/users` | `GET` | **List Users**: List all users or filter by `site_key`. |
 
+### Environment Variables
+
+To run **Golyn** correctly, especially in production environments, you need to define the following environment variables. These variables handle sensitive information like database passwords, JWT secrets, and OAuth2 credentials.
+
+| Variable | Description | Example / Note |
+| :--- | :--- | :--- |
+| `GOLYN_DB_PASSWORD` | Password for the PostgreSQL database user. | `your_db_password` |
+| `GOLYN_JWT_SECRET` | Secret key used to sign and verify JWT tokens. | Use a long, random string. |
+| `GOOGLE_CLIENT_ID` | Client ID for Google OAuth2 integration. | `xxx-yyy.apps.googleusercontent.com` |
+| `GOOGLE_CLIENT_SECRET` | Client Secret for Google OAuth2 integration. | `GOCSPX-xxxxxx` |
+| `GOOGLE_REDIRECT_URL` | Callback URL for Google OAuth2. | `https://your-domain.com/api/v1/auth/google/callback` |
+| `AZURE_CLIENT_ID` | Client ID for Microsoft Azure (Entra ID). | `your-azure-app-id` |
+| `AZURE_CLIENT_SECRET` | Client Secret for Microsoft Azure. | `your-azure-secret` |
+| `AZURE_TENANT_ID` | Tenant ID for your Azure organization. | `your-tenant-id` |
+| `AZURE_REDIRECT_URL` | Callback URL for Azure OAuth2. | `https://your-domain.com/api/v1/auth/azure/callback` |
+| `GITHUB_CLIENT_ID` | Client ID for GitHub OAuth2 integration. | `github_client_id` |
+| `GITHUB_CLIENT_SECRET` | Client Secret for GitHub OAuth2. | `github_client_secret` |
+| `GITHUB_REDIRECT_URL` | Callback URL for GitHub OAuth2. | `https://your-domain.com/api/v1/auth/github/callback` |
+| `GOLYN_AI_SECRET` | Secret key for the Golyn-AI extension handshake. | Required if `golyn-ai` is enabled. |
+| `SMTP_SITE_PASS` | Encrypted SMTP password for a specific site. | Replace `SITE` with your site name (e.g., `SMTP_PORTFOLIO_PASS`). |
+
+> **Tip**: You can define these variables in a `.env` file at the project root or directly in your system's environment. Golyn will automatically expand these variables when they are referenced in the `.conf` files using the `${VARIABLE_NAME}` syntax.
+
 ---
 
 ## Configuration
