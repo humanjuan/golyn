@@ -47,8 +47,6 @@ import (
 )
 
 func TestTokenRevocationFix(t *testing.T) {
-	// 1. Setup Environment
-	// Set GOLYN_BASE_PATH to current working directory if not set, to help utils.GetBasePath()
 	if os.Getenv("GOLYN_BASE_PATH") == "" {
 		cwd, _ := os.Getwd()
 		os.Setenv("GOLYN_BASE_PATH", cwd)

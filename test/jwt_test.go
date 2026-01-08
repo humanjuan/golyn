@@ -65,8 +65,7 @@ TestAuthenticationFlow validates the complete JWT lifecycle:
 5. Resource access with new token
 */
 func TestAuthenticationFlow(t *testing.T) {
-	// 1. Setup Environment
-	// Set GOLYN_BASE_PATH to current working directory if not set, to help utils.GetBasePath()
+	// Setup Environment
 	if os.Getenv("GOLYN_BASE_PATH") == "" {
 		cwd, _ := os.Getwd()
 		os.Setenv("GOLYN_BASE_PATH", cwd)
@@ -118,13 +117,9 @@ func TestAuthenticationFlow(t *testing.T) {
 		db.GetPool().Exec(context.Background(), "DELETE FROM auth.users WHERE username = $1", testUser)
 	}()
 
-	// Ensure we have a valid site ID for the test
-	// If the site doesn't exist, create it temporarily or use an existing one that matches the host context if possible.
-	// In this project, we usually have a site linked to the host.
 	var siteID string
 	err = db.GetPool().QueryRow(context.Background(), "SELECT id FROM core.sites WHERE host = $1 OR host = $2", host, "humanjuan.local").Scan(&siteID)
 	if err != nil {
-		// If not found, let's try to get any site or fail gracefully
 		err = db.GetPool().QueryRow(context.Background(), "SELECT id FROM core.sites LIMIT 1").Scan(&siteID)
 		if err != nil {
 			t.Fatalf("Failed to retrieve any site id: %v", err)

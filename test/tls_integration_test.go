@@ -51,8 +51,6 @@ import (
 )
 
 func TestTLSIntegration(t *testing.T) {
-	// 1. Setup Environment
-	// Set GOLYN_BASE_PATH to current working directory if not set, to help utils.GetBasePath()
 	if os.Getenv("GOLYN_BASE_PATH") == "" {
 		cwd, _ := os.Getwd()
 		os.Setenv("GOLYN_BASE_PATH", cwd)
@@ -115,7 +113,7 @@ func TestTLSIntegration(t *testing.T) {
 		t.Fatalf("Certificate for %s was not loaded into globals", testHost)
 	}
 
-	// 3. Setup Router and Server
+	// Setup Router and Server
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.GET("/ping", func(c *gin.Context) {
@@ -145,8 +143,6 @@ func TestTLSIntegration(t *testing.T) {
 	// Wait for server to be ready
 	time.Sleep(100 * time.Millisecond)
 
-	// 4. Test Client Request
-	// Note: We use the local address but must set the ServerName in TLS config for SNI
 	tlsClientConfig := &tls.Config{
 		InsecureSkipVerify: true,
 		ServerName:         testHost,

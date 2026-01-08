@@ -51,7 +51,7 @@ import (
 )
 
 func TestOAuth2MultiProvider(t *testing.T) {
-	// 1. Setup Environment
+	// Setup Environment
 	if os.Getenv("GOLYN_BASE_PATH") == "" {
 		cwd, _ := os.Getwd()
 		os.Setenv("GOLYN_BASE_PATH", cwd)
@@ -195,10 +195,6 @@ func TestOAuth2MultiProvider(t *testing.T) {
 	})
 
 	t.Run("Callback Logic and Auth Events", func(t *testing.T) {
-		// This test would require mocking the Exchange and fetchUserInfo calls.
-		// For now, we'll verify the RegisterAuthEvent logic in the database directly
-		// to ensure the Phase 3 implementation is robust.
-
 		siteUUID := siteID
 		event := "test_auth_event"
 		ip := "127.0.0.1"

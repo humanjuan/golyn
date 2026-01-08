@@ -103,7 +103,7 @@ func TestAdminAPI(t *testing.T) {
 	db.GetPool().Exec(ctx, "DELETE FROM auth.users WHERE username = $1 OR username = $2", adminUser, "regular@test.local")
 	db.GetPool().Exec(ctx, "DELETE FROM core.sites WHERE key = $1", "test-admin-site")
 
-	// 1. Create SuperAdmin User
+	// Create SuperAdmin User
 	var siteID string
 	err = db.GetPool().QueryRow(ctx, "SELECT id FROM core.sites WHERE host = $1", "humanjuan.local").Scan(&siteID)
 	if err != nil {
@@ -116,7 +116,7 @@ func TestAdminAPI(t *testing.T) {
 		t.Fatalf("Failed to setup SuperAdmin: %v", err)
 	}
 
-	// 2. Create Regular User
+	// Create Regular User
 	_, err = db.GetPool().Exec(ctx, "INSERT INTO auth.users (site_id, username, password_hash, role) VALUES ($1, $2, $3, $4)", siteID, "regular@test.local", "hash", "user")
 
 	// Obtain Tokens
