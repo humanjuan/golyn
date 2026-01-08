@@ -2,7 +2,7 @@ echo "================================ Compile Golang Server to MacOS ==========
 rootPath=$(cd "$(dirname "$0")/.." && pwd)
 buildPath="$rootPath"/builds
 
-version=$(grep 'version' "$rootPath"/cmd/golyn.go | gsed -n 's/.*version.*= *"\(v[0-9]\+\.[0-9]\+\.[0-9]\+\(-[0-9]\+\w\)\?\)".*/\1/p')
+version=$(grep 'version' "$rootPath"/cmd/golyn.go | sed -n 's/.*version.*= *"\(v[^"]*\)".*/\1/p')
 name="Golyn"
 releaseName="$name"_"$version"
 releaseNameNoVersion="$name"
