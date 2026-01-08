@@ -10,6 +10,7 @@ import (
 	"github.com/humanjuan/golyn/routes"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func Setup(router *gin.Engine) map[string]app.VirtualHost {
@@ -27,35 +28,39 @@ func Setup(router *gin.Engine) map[string]app.VirtualHost {
 		// if proxy = true, apply reverse proxy
 		if siteConfig.Proxy {
 			log.Info("Setup() | Site '%s' is configured as reverse proxy for: %v", siteConfig.Directory, siteConfig.Domains)
-			continue
 		}
 
 		// Determine the base path for this site
 		basePath := filepath.Join(config.Server.SitesRootPath, siteConfig.Directory)
 
-		if _, err := os.Stat(basePath); os.IsNotExist(err) {
-			log.Error("Setup() | Site directory does not exist | Path: %s", basePath)
-			continue
+		if !siteConfig.Proxy {
+			if _, err := os.Stat(basePath); os.IsNotExist(err) {
+				log.Error("Setup() | Site directory does not exist | Path: %s", basePath)
+				continue
+			}
 		}
 
-		siteGroup := router.Group(fmt.Sprintf("/%s", siteConfig.Directory))
-		{
-			// Secure static file routes
-			siteGroup.GET("/style/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Style, "style"))
-			siteGroup.GET("/js/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Js, "js"))
-			siteGroup.GET("/assets/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Assets, "assets"))
+		var siteGroup *gin.RouterGroup
+		if !siteConfig.Proxy {
+			siteGroup = router.Group(fmt.Sprintf("/%s", siteConfig.Directory))
+			{
+				// Secure static file routes
+				siteGroup.GET("/style/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Style, "style"))
+				siteGroup.GET("/js/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Js, "js"))
+				siteGroup.GET("/assets/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Assets, "assets"))
 
-			// Serve the index file
-			siteGroup.GET("/", routes.CreateStaticFileHandler(filepath.Join(basePath, "index.html")))
+				// Serve the index file
+				siteGroup.GET("/", routes.CreateStaticFileHandler(filepath.Join(basePath, "index.html")))
 
-			// Serve favicon
-			siteGroup.GET("/favicon.ico", routes.CreateStaticFileHandler(filepath.Join(siteConfig.StaticFiles.Assets, "favicon.ico")))
+				// Serve favicon
+				siteGroup.GET("/favicon.ico", routes.CreateStaticFileHandler(filepath.Join(siteConfig.StaticFiles.Assets, "favicon.ico")))
 
-			// SEO
-			siteGroup.GET("/robots.txt", routes.CreateStaticFileHandler(filepath.Join(basePath, "robots.txt")))
-			siteGroup.GET("/sitemap.xml", routes.CreateStaticFileHandler(filepath.Join(basePath, "sitemap.xml")))
-			siteGroup.GET("/humans.txt", routes.CreateStaticFileHandler(filepath.Join(basePath, "humans.txt")))
+				// SEO
+				siteGroup.GET("/robots.txt", routes.CreateStaticFileHandler(filepath.Join(basePath, "robots.txt")))
+				siteGroup.GET("/sitemap.xml", routes.CreateStaticFileHandler(filepath.Join(basePath, "sitemap.xml")))
+				siteGroup.GET("/humans.txt", routes.CreateStaticFileHandler(filepath.Join(basePath, "humans.txt")))
 
+			}
 		}
 
 		// Asocia cada dominio con el `VirtualHost`
@@ -98,7 +103,9 @@ func CreateDynamicProxyHandler(proxyMap map[string]string) gin.HandlerFunc {
 	log := globals.GetAppLogger()
 	log.Debug("CreateDynamicProxyHandler()")
 	return func(c *gin.Context) {
-		host := c.Request.Host
+		hostParts := strings.Split(c.Request.Host, ":")
+		host := hostParts[0]
+
 		target, exists := proxyMap[host]
 		log.Debug("CreateDynamicProxyHandler() | ProxyCheck | Host: %s | Path: %s | Exists: %v | Target: %s", host, c.Request.URL.Path, exists, target)
 

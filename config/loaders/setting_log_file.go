@@ -9,7 +9,7 @@ import (
 	"github.com/humanjuan/acacia/v2"
 )
 
-func InitLogDB(name string, path string, level string, maxSizeMb int, maxBackup int) (*acacia.Log, error) {
+func InitLogDB(name string, path string, level string, maxSizeMb int, maxBackup int, dailyRotation bool) (*acacia.Log, error) {
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		mkdirErr := os.MkdirAll(path, 0755)
@@ -21,20 +21,20 @@ func InitLogDB(name string, path string, level string, maxSizeMb int, maxBackup 
 		name+"_db.log",
 		path,
 		strings.ToUpper(level),
-		acacia.WithBufferSize(50_000), // suficiente para consultas concurrentes
-		acacia.WithBufferCap(64<<10),  // 64 KB, DB no genera bursts gigantes
-		acacia.WithDrainBurst(256),    // conservador
+		acacia.WithBufferSize(50_000), // Should be enough for concurrent queries
+		acacia.WithBufferCap(64<<10),  // 64 KB, DB won't generate massive bursts
+		acacia.WithDrainBurst(256),    // Conservative drain rate
 		acacia.WithFlushInterval(100*time.Millisecond))
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize Log: %w", err)
 	}
 	LogDB.TimestampFormat(acacia.TS.Special)
 	LogDB.Rotation(maxSizeMb, maxBackup)
-	LogDB.DailyRotation(true)
+	LogDB.DailyRotation(dailyRotation)
 	return LogDB, nil
 }
 
-func InitLog(name string, path string, level string, maxSizeMb int, maxBackup int) (*acacia.Log, error) {
+func InitLog(name string, path string, level string, maxSizeMb int, maxBackup int, dailyRotation bool) (*acacia.Log, error) {
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		mkdirErr := os.MkdirAll(path, 0755)
@@ -46,15 +46,15 @@ func InitLog(name string, path string, level string, maxSizeMb int, maxBackup in
 		name+"_server.log",
 		path,
 		strings.ToUpper(level),
-		acacia.WithBufferSize(250_000), // suficiente para bursts, sin consumir 100MB
-		acacia.WithBufferCap(128<<10),  // 128 KB por búfer interno
-		acacia.WithDrainBurst(512),     // suficiente batching para un server
-		acacia.WithFlushInterval(50*time.Millisecond)) // bajo overhead y latencia equilibrada
+		acacia.WithBufferSize(250_000), // Handle bursts without excessive memory usage
+		acacia.WithBufferCap(128<<10),  // 128 KB internal buffer
+		acacia.WithDrainBurst(512),     // Batching for standard server load
+		acacia.WithFlushInterval(50*time.Millisecond)) // Balanced latency and overhead
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize Log: %w", err)
 	}
 	Log.TimestampFormat(acacia.TS.Special)
 	Log.Rotation(maxSizeMb, maxBackup)
-	Log.DailyRotation(true)
+	Log.DailyRotation(dailyRotation)
 	return Log, nil
 }

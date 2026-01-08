@@ -6,6 +6,5 @@ import (
 )
 
 func RegisterPrivateRoutes(router *gin.RouterGroup) {
-	router.GET("/get_countries", handlers.GetCountries())
 	router.GET("/logs", handlers.GetLogs())
 }

@@ -3,12 +3,14 @@ package loaders
 import (
 	"errors"
 	"fmt"
-	"github.com/humanjuan/golyn/internal/utils"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
+
+	"github.com/humanjuan/golyn/internal/utils"
 
 	"github.com/go-ini/ini"
 )
@@ -26,9 +28,10 @@ type TLS_SSL struct {
 }
 
 type Security struct {
-	AllowOrigin   []string
-	HTTPSRedirect bool
-	TLS_SSL       TLS_SSL
+	AllowOrigin           []string
+	HTTPSRedirect         bool
+	ContentSecurityPolicy string
+	TLS_SSL               TLS_SSL
 }
 type SiteConfig struct {
 	Enabled     bool
@@ -63,6 +66,7 @@ type Server struct {
 	AutoJWT                    bool
 	TokenExpirationTime        int
 	TokenExpirationRefreshTime int
+	JWTSecret                  string
 }
 
 type Cache struct {
@@ -71,10 +75,23 @@ type Cache struct {
 }
 
 type Log struct {
-	Level     string
-	Path      string
-	MaxSizeMb int
-	MaxBackup int
+	Level         string
+	Path          string
+	MaxSizeMb     int
+	MaxBackup     int
+	DailyRotation bool
+}
+
+type OAuthProvider struct {
+	Enabled      bool
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	TenantID     string // Specific for Azure
+}
+
+type OAuth2 struct {
+	Providers map[string]OAuthProvider
 }
 
 type SMTP struct {
@@ -85,12 +102,19 @@ type SMTP struct {
 	RateLimitRequests int
 }
 
+type Extensions struct {
+	Enabled   bool
+	Whitelist map[string]string
+}
+
 type Config struct {
-	Database Database
-	Server   Server
-	Sites    []SiteConfig
-	Cache    Cache
-	Log      Log
+	Database   Database
+	Server     Server
+	Sites      []SiteConfig
+	Cache      Cache
+	Log        Log
+	OAuth2     OAuth2
+	Extensions Extensions
 }
 
 func LoadConfig() (*Config, error) {
@@ -100,6 +124,7 @@ func LoadConfig() (*Config, error) {
 		server   Server
 		cache    Cache
 		log      Log
+		oauth2   OAuth2
 	)
 
 	basePath, err := utils.GetBasePath()
@@ -121,7 +146,7 @@ func LoadConfig() (*Config, error) {
 	database.Database = dbSection.Key("database").String()
 	database.Schema = dbSection.Key("schema").String()
 	database.Username = dbSection.Key("username").String()
-	database.Password = dbSection.Key("password").String()
+	database.Password = expandEnv(dbSection.Key("password").String())
 
 	// Server Configuration
 	serverSection := cfg.Section("server")
@@ -136,6 +161,9 @@ func LoadConfig() (*Config, error) {
 	server.AutoJWT, _ = serverSection.Key("autoJWT").Bool()
 	server.TokenExpirationTime, _ = serverSection.Key("tokenExpirationTime").Int()
 	server.TokenExpirationRefreshTime, _ = serverSection.Key("tokenExpirationRefreshTime").Int()
+
+	// JWT Secret with environment variable support
+	server.JWTSecret = expandEnv(serverSection.Key("jwtSecret").String())
 
 	if !filepath.IsAbs(server.SitesRootPath) {
 		server.SitesRootPath = filepath.Join(basePath, server.SitesRootPath)
@@ -185,6 +213,7 @@ func LoadConfig() (*Config, error) {
 	log.Path = logSection.Key("path").String()
 	log.MaxSizeMb, _ = logSection.Key("maxSizeMB").Int()
 	log.MaxBackup, _ = logSection.Key("maxBackup").Int()
+	log.DailyRotation, _ = logSection.Key("dailyRotation").Bool()
 
 	if !filepath.IsAbs(log.Path) {
 		log.Path = filepath.Join(basePath, log.Path)
@@ -196,13 +225,58 @@ func LoadConfig() (*Config, error) {
 		return &Config{}, errors.New(fmt.Sprintf("A log directory is missing. Please create it manually."))
 	}
 
+	// OAuth2 Configuration
+	oauth2.Providers = make(map[string]OAuthProvider)
+	for _, section := range cfg.Sections() {
+		if strings.HasPrefix(section.Name(), "oauth2.") {
+			providerName := strings.TrimPrefix(section.Name(), "oauth2.")
+			if providerName == "" {
+				continue
+			}
+
+			provider := OAuthProvider{}
+			provider.Enabled, _ = section.Key("enabled").Bool()
+			provider.ClientID = expandEnv(section.Key("client_id").String())
+			provider.ClientSecret = expandEnv(section.Key("client_secret").String())
+			provider.RedirectURL = expandEnv(section.Key("redirect_url").String())
+			provider.TenantID = expandEnv(section.Key("tenant_id").String())
+
+			oauth2.Providers[providerName] = provider
+		}
+	}
+
+	// Extensions Configuration
+	extSection := cfg.Section("extensions")
+	var extensions Extensions
+	extensions.Enabled, _ = extSection.Key("enabled").Bool()
+	extensions.Whitelist = make(map[string]string)
+	for _, key := range extSection.Keys() {
+		if key.Name() == "enabled" {
+			continue
+		}
+		extensions.Whitelist[key.Name()] = expandEnv(key.String())
+	}
+
 	return &Config{
-		Database: database,
-		Server:   server,
-		Sites:    sites,
-		Cache:    cache,
-		Log:      log,
+		Database:   database,
+		Server:     server,
+		Sites:      sites,
+		Cache:      cache,
+		Log:        log,
+		OAuth2:     oauth2,
+		Extensions: extensions,
 	}, nil
+}
+
+func expandEnv(val string) string {
+	if len(val) > 3 && val[0:2] == "${" && val[len(val)-1] == '}' {
+		envVar := val[2 : len(val)-1]
+		expandedVal := os.Getenv(envVar)
+		if expandedVal != "" {
+			return expandedVal
+		}
+	}
+	return val
 }
 
 func loadSiteConfig(name string, path string, basePath string, server Server) (SiteConfig, error) {
@@ -317,13 +391,25 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 
 	// SSL/TLS
 	tls_ssl.Cert, _, _ = CheckString(siteSettings.Key("cert_path"), false, sectionName, "cert_path")
+	if tls_ssl.Cert != "" && !filepath.IsAbs(tls_ssl.Cert) {
+		tls_ssl.Cert = filepath.Join(basePath, tls_ssl.Cert)
+	}
+
 	tls_ssl.Key, _, _ = CheckString(siteSettings.Key("key_path"), false, sectionName, "key_path")
+	if tls_ssl.Key != "" && !filepath.IsAbs(tls_ssl.Key) {
+		tls_ssl.Key = filepath.Join(basePath, tls_ssl.Key)
+	}
+
 	tls_ssl.Chain, _, _ = CheckString(siteSettings.Key("chain_path"), false, sectionName, "chain_path")
+	if tls_ssl.Chain != "" && !filepath.IsAbs(tls_ssl.Chain) {
+		tls_ssl.Chain = filepath.Join(basePath, tls_ssl.Chain)
+	}
 	security.TLS_SSL = tls_ssl
 
 	// SECURITY
 	security.AllowOrigin = siteSettings.Key("allow_origin").Strings(",")
 	security.HTTPSRedirect, _ = siteSettings.Key("enable_https_redirect").Bool()
+	security.ContentSecurityPolicy = siteSettings.Key("content_security_policy").String()
 	siteConfig.Security = security
 
 	// SMTP

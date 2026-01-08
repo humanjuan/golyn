@@ -1,8 +1,8 @@
-echo "================================ Compile Golang Server to Linux OS ================================"
+echo "================================ Compile Golang Server to MacOS ================================"
 rootPath=$(cd "$(dirname "$0")/.." && pwd)
 buildPath="$rootPath"/builds
 
-version=$(grep 'version' "$rootPath"/cmd/golyn.go | gsed -n 's/.*version.*= *"\(v[0-9]\+\.[0-9]\+\.[0-9]\+\(-[0-9]\+\w\)\?\)".*/\1/p')
+version=$(grep 'version' "$rootPath"/cmd/golyn.go | sed -n 's/.*version.*= *"\(v[^"]*\)".*/\1/p')
 name="Golyn"
 releaseName="$name"_"$version"
 releaseNameNoVersion="$name"
@@ -21,6 +21,9 @@ mkdir "$buildPath"/"$releaseNameNoVersion"/certificates
 mkdir "$buildPath"/"$releaseNameNoVersion"/certificates/golyn
 mkdir "$buildPath"/"$releaseNameNoVersion"/sites
 
+echo "Creating modules directory structure..."
+mkdir "$buildPath"/"$releaseNameNoVersion"/config/golyn-ai
+
 
 echo "[OK] Directory structure"
 
@@ -29,10 +32,13 @@ cp -R "$rootPath"/sites/golyn "$buildPath"/"$releaseNameNoVersion"/sites
 cp "$rootPath"/config/server/*.conf "$buildPath"/"$releaseNameNoVersion"/config/server
 cp "$rootPath"/config/sites/*.conf "$buildPath"/"$releaseNameNoVersion"/config/sites
 
+cp "$rootPath"/../golyn-ai/config/*.conf "$buildPath"/"$releaseNameNoVersion"/config/golyn-ai
+cp "$rootPath"/../golyn-ai/config/*.txt "$buildPath"/"$releaseNameNoVersion"/config/golyn-ai
+
 echo "[OK] Copied files"
 
 echo "Compiling..."
-CGO_ENABLED=0 GOARCH=amd64 GOOS=darwin go build -ldflags="-s -w" -o "$buildPath"/"$releaseNameNoVersion"/golyn "$rootPath"/cmd/golyn.go
+CGO_ENABLED=0 GOARCH=amd64 GOOS=darwin go build -ldflags="-s -w -extldflags '-static'" -o "$buildPath"/"$releaseNameNoVersion"/golyn "$rootPath"/cmd/golyn.go
 echo "[OK] Compiled"
 
 echo "Compressing binary..."
@@ -94,5 +100,3 @@ tar -tzvf "$buildPath/${releaseName}_linux.tar.gz"
 echo "[OK] Tarball contents verified"
 
 echo "Ready! :) --> $tar"
-
-

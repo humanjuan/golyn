@@ -30,6 +30,7 @@ func CatchSignalDual(serverTLS, serverHTTP *http.Server) {
 	// Shutdown HTTP server
 	if err := serverHTTP.Shutdown(ctx); err != nil {
 		log.Error("Error shutting down HTTP server: %v", err)
+		log.Sync()
 	} else {
 		log.Info("HTTP server shut down successfully.")
 	}
@@ -37,6 +38,7 @@ func CatchSignalDual(serverTLS, serverHTTP *http.Server) {
 	// Shutdown HTTPS server
 	if err := serverTLS.Shutdown(ctx); err != nil {
 		log.Error("Error shutting down HTTPS server: %v", err)
+		log.Sync()
 	} else {
 		log.Info("HTTPS server shut down successfully.")
 	}

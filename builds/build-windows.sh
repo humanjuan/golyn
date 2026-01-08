@@ -1,4 +1,4 @@
-echo "================================ Compile Golang Server to Linux OS ================================"
+echo "================================ Compile Golang Server to Windows OS ================================"
 rootPath=$(cd "$(dirname "$0")/.." && pwd)
 buildPath="$rootPath"/builds
 
@@ -32,7 +32,7 @@ cp "$rootPath"/config/sites/*.conf "$buildPath"/"$releaseNameNoVersion"/config/s
 echo "[OK] Copied files"
 
 echo "Compiling..."
-CGO_ENABLED=0 GOARCH=amd64 GOOS=windows go build -ldflags="-s -w" -o "$buildPath"/"$releaseNameNoVersion"/golyn "$rootPath"/cmd/golyn.go
+CGO_ENABLED=0 GOARCH=amd64 GOOS=windows go build -ldflags="-s -w -extldflags '-static'" -o "$buildPath"/"$releaseNameNoVersion"/golyn "$rootPath"/cmd/golyn.go
 echo "[OK] Compiled"
 
 echo "Compressing binary..."
@@ -94,6 +94,3 @@ tar -tzvf "$buildPath/${releaseName}_linux.tar.gz"
 echo "[OK] Tarball contents verified"
 
 echo "Ready! :) --> $tar"
-
-
-

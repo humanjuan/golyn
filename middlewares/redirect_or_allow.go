@@ -26,23 +26,31 @@ func RedirectOrAllowHostMiddleware() gin.HandlerFunc {
 		log.Debug("redirectOrAllowHostMiddleware() | Request Received | Host: %s | Path: %s | Method: %s",
 			hostName, c.Request.URL.Path, c.Request.Method)
 
-		// Skip redirection for API paths
-		if strings.HasPrefix(c.Request.URL.Path, "/api") {
-			log.Debug("redirectOrAllowHostMiddleware() | Skipping for API Path | Host: %s | Path: %s | Method: %s",
-				hostName, c.Request.URL.Path, c.Request.Method)
-			c.Next()
-			return
-		}
-
 		// Check if the host matches a configured Virtual Host
 		vh, ok := virtualHosts[hostName]
 		if ok {
+			// If it's a proxy, we don't handle files here, let the proxy handler do its job
+			if vh.Proxy {
+				log.Debug("redirectOrAllowHostMiddleware() | Proxy Host Detected | Host: %s | Passing to next handler", hostName)
+				c.Next()
+				return
+			}
+
+			// Skip redirection for API paths for non-proxy hosts
+			if strings.HasPrefix(c.Request.URL.Path, "/api") {
+				log.Debug("redirectOrAllowHostMiddleware() | Skipping for API Path | Host: %s | Path: %s | Method: %s",
+					hostName, c.Request.URL.Path, c.Request.Method)
+				c.Next()
+				return
+			}
+
 			sitePath := filepath.Clean(vh.BasePath)
 			requestedFile := filepath.Clean(filepath.Join(sitePath, c.Request.URL.Path))
 
 			if !strings.HasPrefix(requestedFile, sitePath) {
 				log.Error("redirectOrAllowHostMiddleware() | Path Traversal Attempt | Host: %s | Path: %s | ResolvedPath: %s",
 					hostName, c.Request.URL.Path, requestedFile)
+				log.Sync()
 				err := fmt.Errorf("access to the requested resources is restricted")
 				c.Error(utils.NewHTTPError(http.StatusForbidden, err.Error()))
 				c.Abort()

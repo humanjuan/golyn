@@ -1,0 +1,22 @@
+services:
+  postgres:
+    build: .
+    container_name: golyn-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      GOLYN_DB_PASSWORD: ${GOLYN_DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - golyn_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  golyn_pg_data:

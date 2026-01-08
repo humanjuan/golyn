@@ -1,23 +1,24 @@
 module github.com/humanjuan/golyn
 
-go 1.23.0
-
-toolchain go1.25.0
+go 1.25.0
 
 require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-ini/ini v1.67.0
-	github.com/humanjuan/acacia/v2 v2.3.0
+	github.com/humanjuan/acacia/v2 v2.3.1
+	github.com/humanjuan/golyn-ai v0.0.0
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/unrolled/secure v1.17.0
 	golang.org/x/crypto v0.36.0
+	golang.org/x/oauth2 v0.34.0
 )
 
 require (
 	github.com/bytedance/sonic/loader v0.2.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 )
 
 require (
@@ -51,3 +52,7 @@ require (
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// Temporary local replace for Golyn development.
+// DO NOT COMMIT
+replace github.com/humanjuan/golyn-ai => ../golyn-ai

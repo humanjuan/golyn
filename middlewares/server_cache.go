@@ -25,6 +25,7 @@ func GetCache(c *gin.Context) *cache.Cache {
 	servCache, ok := c.MustGet("serverCache").(*cache.Cache)
 	if !ok {
 		log.Error("GetCache() | serverCache type mismatch")
+		log.Sync()
 		err := fmt.Errorf("serverCache type mismatch")
 		c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 		c.Abort()
@@ -40,6 +41,7 @@ func FileExistsCached(c *gin.Context, site string, relativePath string, encoding
 
 	if servCache == nil {
 		log.Error("FileExistsCached() | serverCache is nil")
+		log.Sync()
 		return false
 	}
 

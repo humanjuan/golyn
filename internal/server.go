@@ -3,13 +3,16 @@ package internal
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
+	"net/http"
+	"os"
+	"strconv"
+	"time"
+
 	"github.com/humanjuan/golyn/config/loaders"
 	"github.com/humanjuan/golyn/globals"
 	"github.com/humanjuan/golyn/internal/utils"
-	"net/http"
-	"strconv"
-	"time"
 )
 
 func SetupServerHTTPS(router http.Handler) (*http.Server, error) {
@@ -23,16 +26,29 @@ func SetupServerHTTPS(router http.Handler) (*http.Server, error) {
 	for domain, invalid := range globals.InvalidCertificates {
 		if invalid {
 			hasInvalidDomains = true
-			log.Debug("SetupServerHTTPS | Domain %s has invalid certificate", domain)
+			log.Debug("SetupServerHTTPS() | Domain %s has invalid certificate", domain)
 		}
 	}
 	for domain := range globals.Certificates {
-		log.Debug("SetupServerHTTPS | Valid certificate found for domain %s", domain)
+		log.Debug("SetupServerHTTPS() | Valid certificate found for domain %s", domain)
 	}
 	globals.CertMutex.RUnlock()
 
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
+		CurvePreferences: []tls.CurveID{
+			tls.X25519,
+			tls.CurveP256,
+		},
+		PreferServerCipherSuites: true,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		},
 		GetCertificate: func(clientHelloInfo *tls.ClientHelloInfo) (*tls.Certificate, error) {
 			globals.CertMutex.RLock()
 			defer globals.CertMutex.RUnlock()
@@ -103,17 +119,46 @@ func LoadAllCertificates(sites []loaders.SiteConfig) error {
 			}
 
 			// Load certificate
-			cert, err := tls.LoadX509KeyPair(site.Security.TLS_SSL.Cert, site.Security.TLS_SSL.Key)
+			var cert tls.Certificate
+			var err error
+
+			// Load the main certificate and private key
+			cert, err = tls.LoadX509KeyPair(site.Security.TLS_SSL.Cert, site.Security.TLS_SSL.Key)
 			if err != nil {
 				log.Error("loadAllCertificates() | Failed to load SSL certificate. Fallback to HTTP only | Site: %s | Error: %v", site.Directory, err.Error())
+				log.Sync()
 				globals.InvalidCertificates[domain] = true
 				continue
+			}
+
+			// If we have a chain file, we load all certificates from it and replace/append to the certificate list
+			if site.Security.TLS_SSL.Chain != "" && utils.FileOrDirectoryExists(site.Security.TLS_SSL.Chain) {
+				chainData, err := os.ReadFile(site.Security.TLS_SSL.Chain)
+				if err == nil {
+					var chainCerts [][]byte
+					for {
+						var block *pem.Block
+						block, chainData = pem.Decode(chainData)
+						if block == nil {
+							break
+						}
+						if block.Type == "CERTIFICATE" {
+							chainCerts = append(chainCerts, block.Bytes)
+						}
+					}
+					if len(chainCerts) > 0 {
+						cert.Certificate = chainCerts
+					}
+				} else {
+					log.Warn("loadAllCertificates() | Failed to read chain file for extra certificates | Site: %s | Error: %v", site.Directory, err.Error())
+				}
 			}
 
 			// The certificate is expired
 			certs, err := x509.ParseCertificates(cert.Certificate[0])
 			if err != nil {
 				log.Error("loadAllCertificates() | Failed to parse certificate. Fallback to HTTP only | Site: %s | Error: %v", site.Directory, err.Error())
+				log.Sync()
 				globals.InvalidCertificates[domain] = true
 				continue
 			}

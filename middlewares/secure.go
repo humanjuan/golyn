@@ -2,22 +2,24 @@ package middlewares
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/humanjuan/golyn/globals"
 	"github.com/humanjuan/golyn/internal/utils"
 	"github.com/unrolled/secure"
-	"net/http"
-	"strings"
 )
 
 func SecureMiddleware(isDev bool) gin.HandlerFunc {
 	log := globals.GetAppLogger()
 	log.Debug("SecureMiddleware()")
-	security := secure.New(secure.Options{
-		SSLRedirect:          false,
+
+	baseOptions := secure.Options{
+		SSLRedirect:          true,
 		SSLTemporaryRedirect: false,
 		SSLProxyHeaders:      map[string]string{"X-Forwarded-Proto": "https"},
-		STSSeconds:           31536000,
+		STSSeconds:           63072000,
 		STSIncludeSubdomains: true,
 		STSPreload:           true,
 		FrameDeny:            true,
@@ -26,16 +28,29 @@ func SecureMiddleware(isDev bool) gin.HandlerFunc {
 		IsDevelopment:        isDev,
 		ReferrerPolicy:       "strict-origin-when-cross-origin",
 		ContentSecurityPolicy: "default-src 'self'; " +
-			"script-src 'self' 'unsafe-inline' https://code.jquery.com https://cdn.tailwindcss.com; " +
-			"style-src 'self' 'unsafe-inline' https://stackpath.bootstrapcdn.com https://fonts.googleapis.com; " +
-			"font-src 'self' https://fonts.gstatic.com; " +
-			"connect-src 'self' https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; " +
-			"img-src 'self' https://humanjuan.com https://www.humanjuan.com https://golyn.humanjuan.com;",
-	})
+			"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://code.jquery.com https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://apis.google.com https://accounts.google.com; " +
+			"style-src 'self' 'unsafe-inline' https://stackpath.bootstrapcdn.com https://fonts.googleapis.com https://cdn.jsdelivr.net; " +
+			"font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; " +
+			"connect-src 'self' https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com https://www.googleapis.com https://graph.microsoft.com https://login.microsoftonline.com https://*.amazonaws.com; " +
+			"img-src 'self' data: https://humanjuan.com https://www.humanjuan.com https://golyn.humanjuan.com https://cdn.jsdelivr.net https://lh3.googleusercontent.com https://*.amazonaws.com;",
+	}
 
 	return func(c *gin.Context) {
 		hostParts := strings.Split(c.Request.Host, ":")
 		host := hostParts[0]
+
+		// Get per-site security config if available
+		virtualHosts := globals.VirtualHosts
+		var siteCSP string
+		if vh, ok := virtualHosts[host]; ok {
+			siteCSP = vh.Security.ContentSecurityPolicy
+		}
+
+		options := baseOptions
+		if siteCSP != "" {
+			options.ContentSecurityPolicy = siteCSP
+		}
+		security := secure.New(options)
 
 		// Verify valid certificate
 		globals.CertMutex.RLock()
@@ -61,6 +76,7 @@ func SecureMiddleware(isDev bool) gin.HandlerFunc {
 		if c.Request.TLS != nil && (isInvalid || !hasCert) {
 			err := fmt.Sprintf("no valid certificate found | Host: %s", host)
 			log.Error("secureMiddleware() | No valid certificate for HTTPS request | Host: %s | Path: %s | Error: %v", host, c.Request.URL.Path, err)
+			log.Sync()
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err))
 			c.Abort()
 			return
@@ -70,6 +86,7 @@ func SecureMiddleware(isDev bool) gin.HandlerFunc {
 		err := security.Process(c.Writer, c.Request)
 		if err != nil {
 			log.Error("secureMiddleware() | An internal server error occurred while processing security. | Error: %v", err.Error())
+			log.Sync()
 			err = fmt.Errorf("an internal server error occurred while processing security")
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			c.Abort()
