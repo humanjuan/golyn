@@ -28,11 +28,11 @@ func SecureMiddleware(isDev bool) gin.HandlerFunc {
 		IsDevelopment:        isDev,
 		ReferrerPolicy:       "strict-origin-when-cross-origin",
 		ContentSecurityPolicy: "default-src 'self'; " +
-			"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://code.jquery.com https://cdn.tailwindcss.com https://cdn.jsdelivr.net; " +
+			"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://code.jquery.com https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://apis.google.com https://accounts.google.com; " +
 			"style-src 'self' 'unsafe-inline' https://stackpath.bootstrapcdn.com https://fonts.googleapis.com https://cdn.jsdelivr.net; " +
 			"font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; " +
-			"connect-src 'self' https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com; " +
-			"img-src 'self' data: https://humanjuan.com https://www.humanjuan.com https://golyn.humanjuan.com https://cdn.jsdelivr.net;",
+			"connect-src 'self' https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com https://www.googleapis.com https://graph.microsoft.com https://login.microsoftonline.com https://*.amazonaws.com; " +
+			"img-src 'self' data: https://humanjuan.com https://www.humanjuan.com https://golyn.humanjuan.com https://cdn.jsdelivr.net https://lh3.googleusercontent.com https://*.amazonaws.com;",
 	}
 
 	return func(c *gin.Context) {

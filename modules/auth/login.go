@@ -121,6 +121,17 @@ func Login() gin.HandlerFunc {
 			return
 		}
 
+		ip := c.ClientIP()
+		userAgent := c.Request.UserAgent()
+		event := "local_login"
+		var siteUUID *string
+		var siteResults []database.Site
+		err = db.Select("SELECT id FROM core.sites WHERE host = $1", &siteResults, siteID)
+		if err == nil && len(siteResults) > 0 {
+			siteUUID = &siteResults[0].Id
+		}
+		_ = db.RegisterAuthEvent(&user[0].Id, siteUUID, event, ip, userAgent)
+
 		expirationTimeSec := config.Server.TokenExpirationRefreshTime * 60
 		c.SetSameSite(http.SameSiteLaxMode)
 		c.SetCookie("refreshToken", refreshToken, expirationTimeSec, "/", "", !config.Server.Dev, true)
@@ -178,6 +189,43 @@ func RefreshToken() gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, gin.H{
 			"access_token": newAccessToken,
+		})
+	}
+}
+
+func Logout() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := globals.GetAppLogger()
+		config := globals.GetConfig()
+		db := globals.GetDBInstance()
+
+		refreshToken, err := c.Cookie("refreshToken")
+		if err == nil && refreshToken != "" {
+			claims, err := ValidateRefreshToken(refreshToken)
+			if err == nil {
+				// We need the user UUID. CreateToken uses username (subject) to find ID.
+				var users []struct {
+					ID string `db:"id"`
+				}
+				err = db.Select("SELECT id FROM auth.users WHERE username = $1", &users, claims.Subject)
+				if err == nil && len(users) > 0 {
+					_ = db.RevokeAllUserRefreshTokens(users[0].ID)
+					log.Debug("Logout() | Revoked tokens for user: %s", claims.Subject)
+				}
+			}
+		}
+
+		c.SetSameSite(http.SameSiteLaxMode)
+		c.SetCookie("refreshToken", "", -1, "/", "", !config.Server.Dev, true)
+		c.SetCookie("access_token", "", -1, "/", "", !config.Server.Dev, true)
+
+		c.SetCookie("oauth_state", "", -1, "/api/v1/auth", "", !config.Server.Dev, true)
+		c.SetCookie("oauth_next", "", -1, "/api/v1/auth", "", !config.Server.Dev, true)
+
+		log.Info("Logout() | User logged out and cookies cleared | ClientIP: %s", c.ClientIP())
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Successfully logged out",
 		})
 	}
 }

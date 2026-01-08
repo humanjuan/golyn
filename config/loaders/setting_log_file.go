@@ -9,7 +9,7 @@ import (
 	"github.com/humanjuan/acacia/v2"
 )
 
-func InitLogDB(name string, path string, level string, maxSizeMb int, maxBackup int) (*acacia.Log, error) {
+func InitLogDB(name string, path string, level string, maxSizeMb int, maxBackup int, dailyRotation bool) (*acacia.Log, error) {
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		mkdirErr := os.MkdirAll(path, 0755)
@@ -30,11 +30,11 @@ func InitLogDB(name string, path string, level string, maxSizeMb int, maxBackup 
 	}
 	LogDB.TimestampFormat(acacia.TS.Special)
 	LogDB.Rotation(maxSizeMb, maxBackup)
-	LogDB.DailyRotation(true)
+	LogDB.DailyRotation(dailyRotation)
 	return LogDB, nil
 }
 
-func InitLog(name string, path string, level string, maxSizeMb int, maxBackup int) (*acacia.Log, error) {
+func InitLog(name string, path string, level string, maxSizeMb int, maxBackup int, dailyRotation bool) (*acacia.Log, error) {
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		mkdirErr := os.MkdirAll(path, 0755)
@@ -55,6 +55,6 @@ func InitLog(name string, path string, level string, maxSizeMb int, maxBackup in
 	}
 	Log.TimestampFormat(acacia.TS.Special)
 	Log.Rotation(maxSizeMb, maxBackup)
-	Log.DailyRotation(true)
+	Log.DailyRotation(dailyRotation)
 	return Log, nil
 }

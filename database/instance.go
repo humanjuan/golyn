@@ -39,7 +39,7 @@ func (dbi *DBInstance) InitDB(config *loaders.Database, log *acacia.Log) error {
 	}
 
 	var version string
-	sqlStatement := "SELECT version()"
+	sqlStatement := Queries["get_db_version"]
 	err = dbi.db.QueryRow(context.Background(), sqlStatement).Scan(&version)
 	if err != nil {
 		log.Error("Failed to fetch database version: %w", err.Error())

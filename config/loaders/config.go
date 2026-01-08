@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/humanjuan/golyn/internal/utils"
@@ -74,10 +75,23 @@ type Cache struct {
 }
 
 type Log struct {
-	Level     string
-	Path      string
-	MaxSizeMb int
-	MaxBackup int
+	Level         string
+	Path          string
+	MaxSizeMb     int
+	MaxBackup     int
+	DailyRotation bool
+}
+
+type OAuthProvider struct {
+	Enabled      bool
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	TenantID     string // Specific for Azure
+}
+
+type OAuth2 struct {
+	Providers map[string]OAuthProvider
 }
 
 type SMTP struct {
@@ -99,6 +113,7 @@ type Config struct {
 	Sites      []SiteConfig
 	Cache      Cache
 	Log        Log
+	OAuth2     OAuth2
 	Extensions Extensions
 }
 
@@ -109,6 +124,7 @@ func LoadConfig() (*Config, error) {
 		server   Server
 		cache    Cache
 		log      Log
+		oauth2   OAuth2
 	)
 
 	basePath, err := utils.GetBasePath()
@@ -130,15 +146,7 @@ func LoadConfig() (*Config, error) {
 	database.Database = dbSection.Key("database").String()
 	database.Schema = dbSection.Key("schema").String()
 	database.Username = dbSection.Key("username").String()
-	database.Password = dbSection.Key("password").String()
-	// Expand environment variables if format is ${VAR}
-	if len(database.Password) > 3 && database.Password[0:2] == "${" && database.Password[len(database.Password)-1] == '}' {
-		envVar := database.Password[2 : len(database.Password)-1]
-		expandedVal := os.Getenv(envVar)
-		if expandedVal != "" {
-			database.Password = expandedVal
-		}
-	}
+	database.Password = expandEnv(dbSection.Key("password").String())
 
 	// Server Configuration
 	serverSection := cfg.Section("server")
@@ -155,15 +163,7 @@ func LoadConfig() (*Config, error) {
 	server.TokenExpirationRefreshTime, _ = serverSection.Key("tokenExpirationRefreshTime").Int()
 
 	// JWT Secret with environment variable support
-	jwtSecret := serverSection.Key("jwtSecret").String()
-	if len(jwtSecret) > 3 && jwtSecret[0:2] == "${" && jwtSecret[len(jwtSecret)-1] == '}' {
-		envVar := jwtSecret[2 : len(jwtSecret)-1]
-		expandedVal := os.Getenv(envVar)
-		if expandedVal != "" {
-			jwtSecret = expandedVal
-		}
-	}
-	server.JWTSecret = jwtSecret
+	server.JWTSecret = expandEnv(serverSection.Key("jwtSecret").String())
 
 	if !filepath.IsAbs(server.SitesRootPath) {
 		server.SitesRootPath = filepath.Join(basePath, server.SitesRootPath)
@@ -213,6 +213,7 @@ func LoadConfig() (*Config, error) {
 	log.Path = logSection.Key("path").String()
 	log.MaxSizeMb, _ = logSection.Key("maxSizeMB").Int()
 	log.MaxBackup, _ = logSection.Key("maxBackup").Int()
+	log.DailyRotation, _ = logSection.Key("dailyRotation").Bool()
 
 	if !filepath.IsAbs(log.Path) {
 		log.Path = filepath.Join(basePath, log.Path)
@@ -224,6 +225,26 @@ func LoadConfig() (*Config, error) {
 		return &Config{}, errors.New(fmt.Sprintf("A log directory is missing. Please create it manually."))
 	}
 
+	// OAuth2 Configuration
+	oauth2.Providers = make(map[string]OAuthProvider)
+	for _, section := range cfg.Sections() {
+		if strings.HasPrefix(section.Name(), "oauth2.") {
+			providerName := strings.TrimPrefix(section.Name(), "oauth2.")
+			if providerName == "" {
+				continue
+			}
+
+			provider := OAuthProvider{}
+			provider.Enabled, _ = section.Key("enabled").Bool()
+			provider.ClientID = expandEnv(section.Key("client_id").String())
+			provider.ClientSecret = expandEnv(section.Key("client_secret").String())
+			provider.RedirectURL = expandEnv(section.Key("redirect_url").String())
+			provider.TenantID = expandEnv(section.Key("tenant_id").String())
+
+			oauth2.Providers[providerName] = provider
+		}
+	}
+
 	// Extensions Configuration
 	extSection := cfg.Section("extensions")
 	var extensions Extensions
@@ -233,16 +254,7 @@ func LoadConfig() (*Config, error) {
 		if key.Name() == "enabled" {
 			continue
 		}
-		val := key.String()
-		// Expand environment variables if format is ${VAR}
-		if len(val) > 3 && val[0:2] == "${" && val[len(val)-1] == '}' {
-			envVar := val[2 : len(val)-1]
-			expandedVal := os.Getenv(envVar)
-			if expandedVal != "" {
-				val = expandedVal
-			}
-		}
-		extensions.Whitelist[key.Name()] = val
+		extensions.Whitelist[key.Name()] = expandEnv(key.String())
 	}
 
 	return &Config{
@@ -251,8 +263,20 @@ func LoadConfig() (*Config, error) {
 		Sites:      sites,
 		Cache:      cache,
 		Log:        log,
+		OAuth2:     oauth2,
 		Extensions: extensions,
 	}, nil
+}
+
+func expandEnv(val string) string {
+	if len(val) > 3 && val[0:2] == "${" && val[len(val)-1] == '}' {
+		envVar := val[2 : len(val)-1]
+		expandedVal := os.Getenv(envVar)
+		if expandedVal != "" {
+			return expandedVal
+		}
+	}
+	return val
 }
 
 func loadSiteConfig(name string, path string, basePath string, server Server) (SiteConfig, error) {

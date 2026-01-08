@@ -20,24 +20,36 @@ func (dbi *DBInstance) Select(query string, result interface{}, args ...interfac
 		return errors.New("'result' must be a pointer to a struct slice")
 	}
 
-	// Get the type of the slice elements (e.g., Country{})
+	// Get the type of the slice elements (e.g., User{})
 	elemType := v.Elem().Type().Elem()
 
 	// Map database column names to struct field indices
 	colMap := make(map[string]int)
 	for i := 0; i < elemType.NumField(); i++ {
-		colName := elemType.Field(i).Tag.Get("db") // Column name defined in 'db' tag
-		colMap[colName] = i
+		tag := elemType.Field(i).Tag.Get("db")
+		if tag != "" {
+			colMap[tag] = i
+		}
 	}
 
+	// Get column descriptions to know the order
+	fieldDescriptions := rows.FieldDescriptions()
+
 	for rows.Next() {
-		// Create a new instance of the struct (item := country{})
+		// Create a new instance of the struct
 		item := reflect.New(elemType).Elem()
 
-		// Map row values to struct fields
-		values := make([]interface{}, len(colMap))
-		for _, colIndex := range colMap {
-			values[colIndex] = item.Field(colIndex).Addr().Interface()
+		// Prepare a slice of interfaces to hold the row values
+		values := make([]interface{}, len(fieldDescriptions))
+		for i, fd := range fieldDescriptions {
+			colName := fd.Name
+			if fieldIdx, ok := colMap[colName]; ok {
+				values[i] = item.Field(fieldIdx).Addr().Interface()
+			} else {
+				// Column not found in struct, scan into a dummy variable
+				var dummy interface{}
+				values[i] = &dummy
+			}
 		}
 
 		if err := rows.Scan(values...); err != nil {

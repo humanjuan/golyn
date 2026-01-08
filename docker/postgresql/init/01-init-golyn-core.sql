@@ -52,6 +52,7 @@ CREATE TABLE auth.users (
                             site_id         UUID NOT NULL,
                             username        TEXT NOT NULL,
                             password_hash   TEXT NOT NULL,
+                            role            TEXT NOT NULL DEFAULT 'user', -- 'SuperAdmin', 'Admin', 'user'
                             status          TEXT NOT NULL DEFAULT 'active',
                             created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
                             updated_at      TIMESTAMPTZ,
@@ -78,6 +79,28 @@ CREATE TABLE auth.refresh_tokens (
                                              REFERENCES auth.users(id)
                                              ON DELETE CASCADE
 );
+
+CREATE TABLE auth.external_identities (
+                                          id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                                          user_id         UUID NOT NULL,
+                                          provider        TEXT NOT NULL, -- 'azure', 'google', 'github', etc.
+                                          external_id     TEXT NOT NULL, -- ID unique from the provider
+                                          email           TEXT,
+                                          metadata        JSONB,
+                                          created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+                                          updated_at      TIMESTAMPTZ,
+
+                                          CONSTRAINT fk_external_identities_user
+                                              FOREIGN KEY (user_id)
+                                                  REFERENCES auth.users(id)
+                                                  ON DELETE CASCADE,
+
+                                          CONSTRAINT ux_external_provider_id
+                                              UNIQUE (provider, external_id)
+);
+
+CREATE INDEX ix_external_identities_user
+    ON auth.external_identities (user_id);
 
 CREATE INDEX ix_refresh_tokens_user
     ON auth.refresh_tokens (user_id);

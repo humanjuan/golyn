@@ -13,6 +13,13 @@ func RegisterPublicRoutes(router *gin.RouterGroup, serverInfo *app.Info) {
 	router.GET("/ping", handlers.Ping)
 	router.GET("/csrf-token", middlewares.GenerateCSRFToken)
 	router.POST("/login", auth.Login())
+	router.POST("/logout", auth.Logout())
 	router.POST("/refresh_token", auth.RefreshToken())
+	router.GET("/auth/azure/login", auth.OAuth2Login("azure"))
+	router.GET("/auth/azure/callback", auth.OAuth2Callback("azure"))
+	router.GET("/auth/google/login", auth.OAuth2Login("google"))
+	router.GET("/auth/google/callback", auth.OAuth2Callback("google"))
+	router.GET("/auth/github/login", auth.OAuth2Login("github"))
+	router.GET("/auth/github/callback", auth.OAuth2Callback("github"))
 	router.POST("/send-mail", middlewares.CSRFMiddleware(), middlewares.RateLimitMiddleware(), handlers.SendmailHandler())
 }

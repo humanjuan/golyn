@@ -11,6 +11,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/unrolled/secure v1.17.0
 	golang.org/x/crypto v0.36.0
+	golang.org/x/oauth2 v0.34.0
 )
 
 require (

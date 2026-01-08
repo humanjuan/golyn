@@ -5,6 +5,7 @@
 ![Golang](https://img.shields.io/badge/Language-Go-blue?logo=go)
 ![Open Source](https://img.shields.io/badge/Open%20Source-Yes-brightgreen?logo=opensourceinitiative)
 ![Status](https://img.shields.io/badge/Status-In%20Development-orange?logo=githubactions)
+![SSL Labs A+](https://img.shields.io/badge/SSL%20Labs-A%2B-brightgreen?logo=ssl)
 ![Go Version](https://img.shields.io/badge/Go-v1.25.0-blue?logo=go)
 [![Gin Version](https://img.shields.io/badge/Gin%20Framework-v1.10.0-lightblue)](https://github.com/gin-gonic/gin)
 [![Logger](https://img.shields.io/badge/Acacia-v2-lightblue)](https://github.com/humanjuan/acacia)
@@ -85,76 +86,142 @@ Golyn features a robust, secure, and orchestrated extension system that allows e
 
 ---
 
-## Platform JWT (Golyn Identity Contract)
+### Platform Identity & Authentication
 
-Golyn uses a standardized JWT (JSON Web Token) contract to manage identity and context across the entire platform. This contract ensures that any module (HR, AI, or future products) can trust the token without knowing Golyn's internal logic.
+Golyn provides a centralized multi-site identity platform using standardized JWT contracts, secure cookies, and a robust OAuth2/SSO broker.
 
-### JWT Platform Contract
+### Platform JWT Contract
 
-The tokens issued by Golyn follow a minimal and strict claim structure:
+Tokens issued by Golyn follow a minimal and strict claims structure, ensuring any consumer module can trust the identity without knowing Golyn's internal logic.
 
-| Claim | Source | Description |
+| Claim | Type | Description |
 | :--- | :--- | :--- |
-| `sub` | Registered | **Subject**: Stable identity of the user (e.g., username or UUID). |
-| `site_id` | Custom | **Tenant/Organization**: Context where the user is operating. |
-| `iat` | Registered | **Issued At**: Token generation timestamp. |
-| `exp` | Registered | **Expiration**: Security boundary for token validity. |
-| `iss` | Registered | **Issuer**: Always set to `"Golyn"`. |
-| `aud` | Registered | **Audience**: Destination validation, set to `"GolynPlatform"`. |
+| `sub` | UUID/String | **Subject**: Unique and stable user identifier. |
+| `site_id` | UUID | **Tenant/Organization**: The unique site/context identifier. |
+| `iat` | Numeric | **Issued At**: Token generation timestamp. |
+| `exp` | Numeric | **Expiration**: Security limit for token validity. |
+| `iss` | String | **Issuer**: Always set to `"Golyn"`. |
+| `aud` | String | **Audience**: Target validation, set to `"GolynPlatform"`. |
 
-> **Important**: Domain-specific data (roles, permissions, hierarchies) are **prohibited** within the Golyn JWT. The token identifies *who* and *where*, not the business rules.
+> **Security Note**: Golyn acts as an Identity Provider. Domain-specific data (business roles, permissions, etc.) are **forbidden** within the platform JWT. The token identifies *who* and *where*, while business rules remain in the specific products.
 
-### Identity Model
-- **Subject (`sub`)**: This is the primary key for user identification. In Golyn, while it usually contains the username/email, it should be treated as an opaque stable identifier by consuming modules.
-- **Site Context (`site_id`)**: Enables true multi-tenant support. Every token is bound to a specific site (extracted from the request host during login).
+### Token Delivery & Security (Cookies)
 
-### Token Lifecycle
+To mitigate risks like *Token Leakage* in URLs or logs, Golyn uses a cookie-based delivery mechanism:
 
-Golyn implements a dual-token rotation system for security:
+- **`access_token`**: Stored in a cookie with `HttpOnly` and `Secure` attributes. The authentication middleware looks for it automatically if not provided in the `Authorization` header.
+- **`refreshToken`**: Stored in an `HttpOnly` and `Secure` cookie, used exclusively to obtain new access tokens without requiring user intervention.
 
-1.  **Access Token**: Short-lived token used for every request.
-2.  **Refresh Token**: Long-lived token used to obtain new Access Tokens. It is stored in a secure, HttpOnly cookie.
-3.  **Automatic Revocation**: When a new session is created or a token is refreshed, old tokens are invalidated in the database to prevent replay attacks.
+### Multi-provider OAuth2 (SSO Broker)
 
-### Configuration
+Golyn acts as an **Identity Broker**, allowing users to authenticate through their corporate or personal accounts from major providers.
 
-Security secrets must be defined via environment variables:
+#### Supported Providers:
+- **Microsoft Azure AD** (Entra ID)
+- **Google**
+- **GitHub**
 
+#### Authentication Flow:
+1.  **Redirection**: Send the user to `GET /api/v1/auth/{provider}/login`.
+2.  **Continuity**: Use the `next` parameter to specify where the user should return (e.g., `/login?next=https://your-app.com/dashboard`).
+3.  **Handshake**: After a successful login, Golyn redirects the user to the `next` URL. Tokens are automatically set as secure cookies in the browser.
+
+### Logout
+
+Logout is comprehensive and secure:
+- **Endpoint**: `POST /api/v1/logout`.
+- **Actions**:
+    - Clears `access_token` and `refreshToken` cookies (set-cookie with expiration -1).
+    - Permanently revokes the refresh token in the database to prevent further use.
+    - Clears temporary OAuth2 state cookies.
+
+### Audit & Security
+
+- **Auditing**: All events (local login, OAuth2, refreshes, logout) are logged in `audit.auth_events` with IP and User-Agent.
+- **Token Rotation**: Implements a rotation system that invalidates old sessions when starting new ones (configurable).
+- **Revocation**: Administrators can revoke tokens globally per user.
+
+### Transport Security
+
+Golyn is designed with a "Security First" approach. Our production configuration consistently achieves an **A+ rating** on [SSL Labs](https://www.ssllabs.com/), thanks to:
+- Enforced **HSTS** (HTTP Strict Transport Security) with preloading.
+- **TLS 1.3** and **TLS 1.2** only (legacy protocols disabled).
+- High-grade cipher suites with **Forward Secrecy**.
+- Optimized Elliptic Curve certificates.
+
+---
+
+## Administration API
+
+Golyn includes a protected API for platform management, allowing administrators to manage sites and users programmatically. All admin endpoints require a JWT with `SuperAdmin` or `Admin` roles.
+
+### Administrative Roles
+- **SuperAdmin**: Full access to all administrative functions.
+- **Admin**: Restricted administrative access (e.g., managing a specific set of users).
+
+### Key Endpoints (`/api/v1/admin`)
+
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/sites` | `POST` | **Create Site**: Register a new tenant (requires `key` and `host`). |
+| `/sites` | `GET` | **List Sites**: Retrieve all registered organizations. |
+| `/users` | `POST` | **Create User**: Add a user to a site (requires `site_key`, `username`, `password`). |
+| `/users` | `GET` | **List Users**: List all users or filter by `site_key`. |
+
+---
+
+## Configuration
+
+Security secrets and provider credentials must be defined via environment variables.
+
+### 1. Global Secrets
 ```ini
 # config/server/web_server.conf
 [server]
-tokenExpirationTime = 5         # Minutes
-tokenExpirationRefreshTime = 1440 # Minutes (24h)
+tokenExpirationTime = 5         # Access Token duration (minutes)
+tokenExpirationRefreshTime = 1440 # Refresh Token duration (minutes)
 jwtSecret = ${GOLYN_JWT_SECRET}
 ```
 
-### Usage for Developers
+### 2. OAuth2 Providers
+Add your provider credentials to the configuration and the `.env` file:
+```ini
+[oauth2.azure]
+enabled = true
+client_id = ${AZURE_CLIENT_ID}
+client_secret = ${AZURE_CLIENT_SECRET}
+tenant_id = ${AZURE_TENANT_ID}
+redirect_url = https://your-domain.com/api/v1/auth/azure/callback
+```
 
-#### 1. Protecting Routes (Middleware)
-Use the `AuthMiddleware()` to protect any Gin router group. It automatically validates the token and sets the `subject` and `site_id` in the context.
+---
+
+## Usage for Developers
+
+### 1. Protecting Routes (Middleware)
+The `AuthMiddleware()` validates the token and injects the `subject` and `site_id` into the Gin context.
 
 ```go
-private := router.Group("/api/v1/private")
-private.Use(middlewares.AuthMiddleware())
+private := router.Group("/api/v1/private", middlewares.AuthMiddleware())
 {
     private.GET("/data", func(c *gin.Context) {
-        subject := c.GetString("subject")
-        siteID := c.GetString("site_id")
-        // Your logic here
+        subject := c.GetString("subject") // User UUID
+        siteID := c.GetString("site_id")  // Site UUID
+        // Business logic here
     })
 }
 ```
 
-#### 2. Manual Token Validation
-If you are building an external service or a standalone extension, you can validate tokens using the `internal/security/jwt` package:
+### 2. Identity Mapping in Code
+If you need to validate a token in an external service, use the `internal/security/jwt` package:
 
 ```go
 import platjwt "github.com/humanjuan/golyn/internal/security/jwt"
 
 claims, err := platjwt.ValidateRefreshToken(tokenString)
 if err == nil {
-    fmt.Println("User:", claims.Subject)
-    fmt.Println("Site:", claims.SiteID)
+    // Identity is now trusted
+    fmt.Printf("Subject: %s, Site: %s", claims.Subject, claims.SiteID)
 }
 ```
 
@@ -272,13 +339,14 @@ class GolynAuthService {
 
   /**
    * Logout.
-   * Note: Golyn revokes tokens on new logins, but you should clear local state.
+   * Note: Golyn revokes tokens on the server and clears cookies.
    */
-  static logout(): void {
+  static async logout(): Promise<void> {
+    await fetch(`${this.API_BASE}/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    });
     this.accessToken = null;
-    // For a full logout, you'd typically call a logout endpoint 
-    // that clears the refreshToken cookie via Set-Cookie header.
-    document.cookie = "refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     window.location.href = "/login";
   }
 }
@@ -312,6 +380,10 @@ This tool manages tenants (sites) and users. You can also access it via `./manag
 - `./manage_db.sh clients add-site <key> <host>`: Registers a new site (e.g., `hr-site hr.local`).
 - `./manage_db.sh clients add-user <site_key> <username> <password>`: Creates a user for a specific site.
 - **Automatic Hashing**: The script automatically detects if the password is plain text and hashes it using the Golyn binary before storing it in the database.
+
+### SQL Query Centralization
+
+To improve maintainability, Golyn uses a centralized query map in `database/queries.go`. This allows all SQL statements to be audited and optimized in one place, avoiding hardcoded SQL in data repositories.
 
 > **Note on Docker**: The provided Docker configurations are intended for **development only**. Choosing the final production database (PostgreSQL, RDS, etc.) and the orchestration layer (Docker, Kubernetes, or bare metal) is the responsibility of the implementer. Golyn is designed to be infrastructure-agnostic.
 
@@ -392,6 +464,12 @@ smtp_password=${SMTP_PASS}
 
 3. **Extendability for Future Use Cases:**  
    The server's modular architecture allows it to adapt to future needs, such as integrating APIs, authentication systems, or more.
+
+4. **Identity as a Service (IDaaS):**
+   Use Golyn as a centralized authentication hub for all your projects. It provides:
+   - **Single Sign-On (SSO)**: One login for multiple subdomains or services.
+   - **Multi-tenancy**: Isolated user management per site/tenant.
+   - **Token Federation**: Standardized JWTs that can be validated by any backend (Go, Node.js, Python, etc.).
 
 ---
 

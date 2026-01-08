@@ -16,7 +16,7 @@ type Token struct {
 }
 
 func (dbi *DBInstance) StoreRefreshToken(refreshToken, userID string, expiresAt time.Time) error {
-	query := `INSERT INTO auth.refresh_tokens (token, user_id, issued_at, expires_at, revoked) VALUES ($1, $2, NOW(), $3, false)`
+	query := Queries["store_refresh_token"]
 
 	_, err := dbi.db.Exec(context.Background(), query, refreshToken, userID, expiresAt)
 	if err != nil {
@@ -29,7 +29,7 @@ func (dbi *DBInstance) StoreRefreshToken(refreshToken, userID string, expiresAt 
 func (dbi *DBInstance) GetRefreshToken(tokenValue string) (*Token, error) {
 	var token Token
 
-	query := `SELECT id, token, user_id, revoked, expires_at FROM auth.refresh_tokens WHERE token = $1`
+	query := Queries["get_refresh_token"]
 
 	row := dbi.db.QueryRow(context.Background(), query, tokenValue)
 	err := row.Scan(&token.ID, &token.Token, &token.UserID, &token.Revoked, &token.ExpiresAt)

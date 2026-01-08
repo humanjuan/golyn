@@ -59,11 +59,11 @@ func main() {
 	lifecycle.Init()
 
 	// Setup loggers
-	logApp, err := loaders.InitLog(strings.ToLower(conf.Server.Name), conf.Log.Path, conf.Log.Level, conf.Log.MaxSizeMb, conf.Log.MaxBackup)
+	logApp, err := loaders.InitLog(strings.ToLower(conf.Server.Name), conf.Log.Path, conf.Log.Level, conf.Log.MaxSizeMb, conf.Log.MaxBackup, conf.Log.DailyRotation)
 	if err != nil {
 		panic(fmt.Sprintf("main() | Server logger init failed: %v", err.Error()))
 	}
-	logDB, err := loaders.InitLogDB(strings.ToLower(conf.Server.Name), conf.Log.Path, conf.Log.Level, conf.Log.MaxSizeMb, conf.Log.MaxBackup)
+	logDB, err := loaders.InitLogDB(strings.ToLower(conf.Server.Name), conf.Log.Path, conf.Log.Level, conf.Log.MaxSizeMb, conf.Log.MaxBackup, conf.Log.DailyRotation)
 	if err != nil {
 		panic(fmt.Sprintf("main() | DB logger init failed: %v", err.Error()))
 	}
