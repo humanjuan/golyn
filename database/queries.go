@@ -41,8 +41,9 @@ var Queries = map[string]string{
 	"revoke_refresh_token_id": `UPDATE auth.refresh_tokens SET revoked = true WHERE id = $1`,
 
 	// Others
-	"get_db_version": `SELECT version()`,
-	"get_user_role":  `SELECT role FROM auth.users WHERE username = $1`,
+	"get_db_version":       `SELECT version()`,
+	"get_user_role":        `SELECT role FROM auth.users WHERE username = $1`,
+	"get_user_by_username": `SELECT id, site_id, username, role, status, created_at, updated_at FROM auth.users WHERE username = $1`,
 }
 
 type LoginUser struct {
