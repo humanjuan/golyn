@@ -4,7 +4,7 @@ set -e
 # =========================================================
 # Golyn - PostgreSQL Database Manager
 # =========================================================
-
+export $(grep -v '^#' /Volumes/Juan_Ext/projects/Golyn/golyn/.env | xargs)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"

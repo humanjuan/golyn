@@ -32,7 +32,7 @@ func CreateTokenWithRevocation(subject string, siteID string, revokeOthers bool)
 	var users []struct {
 		ID string `db:"id"`
 	}
-	err := db.Select("SELECT id FROM auth.users WHERE username = $1", &users, subject)
+	err := db.Select("SELECT id FROM auth.users WHERE lower(username) = lower($1)", &users, subject)
 	if err != nil || len(users) == 0 {
 		log.Error("CreateToken() | User not found: %s", subject)
 		return "", "", errors.New("user not found")
@@ -137,6 +137,10 @@ func IssueNewTokens(refreshToken string, claims *Claims) (string, string, error)
 
 	if oldRefreshToken.Revoked == true {
 		return "", "", errors.New("token has already been used")
+	}
+
+	if oldRefreshToken.ExpiresAt.Before(time.Now()) {
+		return "", "", errors.New("refresh token has expired in database")
 	}
 
 	accessToken, newRefreshTokenString, err := CreateTokenWithRevocation(subject, siteID, false)
