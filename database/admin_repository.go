@@ -36,6 +36,12 @@ func (dbi *DBInstance) DeleteSite(key string) error {
 	return err
 }
 
+func (dbi *DBInstance) UpdateSiteStatus(key, status string) error {
+	query := Queries["update_site_status"]
+	_, err := dbi.db.Exec(context.Background(), query, status, key)
+	return err
+}
+
 func (dbi *DBInstance) GetAllUsers() ([]User, error) {
 	var users []User
 	query := Queries["get_all_users"]
@@ -65,5 +71,32 @@ func (dbi *DBInstance) UpdateUserRole(username, role string) error {
 func (dbi *DBInstance) DeleteUser(username string) error {
 	query := Queries["delete_user"]
 	_, err := dbi.db.Exec(context.Background(), query, username)
+	return err
+}
+
+func (dbi *DBInstance) UpdateUserStatus(username, status string) error {
+	query := Queries["update_user_status"]
+	_, err := dbi.db.Exec(context.Background(), query, status, username)
+	return err
+}
+
+func (dbi *DBInstance) GetUserPermissions(username string) ([]byte, error) {
+	var results []struct {
+		Permissions []byte `db:"permissions"`
+	}
+	query := Queries["get_user_permissions"]
+	err := dbi.Select(query, &results, username)
+	if err != nil {
+		return nil, err
+	}
+	if len(results) == 0 {
+		return nil, nil
+	}
+	return results[0].Permissions, nil
+}
+
+func (dbi *DBInstance) UpdateUserPermissions(username string, permissions []byte) error {
+	query := Queries["update_user_permissions"]
+	_, err := dbi.db.Exec(context.Background(), query, permissions, username)
 	return err
 }
