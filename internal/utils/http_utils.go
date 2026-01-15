@@ -46,6 +46,14 @@ var httpCodeMessages = map[int]string{
 	ServiceUnavailable:  "[Service Unavailable] The server is not ready to handle the request. May be due to overload or maintenance.",
 }
 
+// APIResponse is the standard structure for all API responses
+type APIResponse struct {
+	Success bool        `json:"success"`
+	Message string      `json:"message,omitempty"`
+	Data    interface{} `json:"data,omitempty"`
+	Error   string      `json:"error,omitempty"`
+}
+
 func GetCodeMessage(code int) string {
 	message, exists := httpCodeMessages[code]
 	if exists {

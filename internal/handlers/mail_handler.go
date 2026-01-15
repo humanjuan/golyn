@@ -178,8 +178,9 @@ func SendmailHandler() gin.HandlerFunc {
 		}
 
 		log.Info("SendmailHandler() | Message sent successfully | from: %s | to: %s", from, to)
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Message sent successfully",
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: "Message sent successfully",
 		})
 	}
 }

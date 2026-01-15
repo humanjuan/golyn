@@ -47,15 +47,10 @@ func GetMe() gin.HandlerFunc {
 
 		user := users[0]
 
-		// Return user profile safely (excluding sensitive data like PasswordHash)
-		c.JSON(http.StatusOK, gin.H{
-			"id":         user.Id,
-			"site_id":    user.SiteID,
-			"username":   user.Username,
-			"role":       user.Role,
-			"status":     user.Status,
-			"created_at": user.CreatedAt,
-			"updated_at": user.UpdatedAt,
+		// Return user profile safely using UserDTO
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Data:    MapUserToDTO(user),
 		})
 	}
 }

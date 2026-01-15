@@ -167,7 +167,6 @@ func GetLogs() gin.HandlerFunc {
 		}
 
 		response := gin.H{
-			"message":    utils.GetCodeMessage(http.StatusOK),
 			"logs":       logs,
 			"totalLines": totalLines,
 			"totalPages": totalPages,
@@ -181,6 +180,9 @@ func GetLogs() gin.HandlerFunc {
 			response["totalLogs"] = len(logs)
 		}
 
-		c.IndentedJSON(http.StatusOK, response)
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Data:    response,
+		})
 	}
 }
