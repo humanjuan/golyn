@@ -101,7 +101,6 @@ func OAuth2Callback(provider string) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		// Clear state cookie
 		c.SetCookie("oauth_state", "", -1, "/api/v1/auth", "", !config.Server.Dev, true)
 
 		code := c.Query("code")
@@ -132,13 +131,12 @@ func OAuth2Callback(provider string) gin.HandlerFunc {
 
 		db := globals.GetDBInstance()
 
-		// 1. Check if external identity exists
 		extIdentity, err := db.GetExternalIdentity(provider, userInfo.ID)
 		var user *database.User
 
 		if err == nil && extIdentity != nil {
 			var users []database.User
-			err = db.Select("SELECT id, site_id, username, password_hash, status FROM auth.users WHERE id = $1", &users, extIdentity.UserId)
+			err = db.Select("SELECT id, site_id, username, status FROM auth.users WHERE id = $1", &users, extIdentity.UserId)
 			if err == nil && len(users) > 0 {
 				user = &users[0]
 				// Update metadata and email if they changed
@@ -150,7 +148,6 @@ func OAuth2Callback(provider string) gin.HandlerFunc {
 			}
 		}
 
-		// 2. If not found by external ID, try by email
 		if user == nil {
 			log.Debug("OAuth2Callback(%s) | Searching user by email: %s", provider, userInfo.Email)
 			userByEmail, err := db.GetUserByEmail(userInfo.Email)
@@ -167,7 +164,6 @@ func OAuth2Callback(provider string) gin.HandlerFunc {
 			}
 		}
 
-		// 3. User still not found?
 		if user == nil {
 			log.Warn("OAuth2Callback(%s) | User not found: %s", provider, userInfo.Email)
 			c.Error(utils.NewHTTPError(http.StatusUnauthorized, "User not registered in Golyn platform"))
@@ -182,7 +178,6 @@ func OAuth2Callback(provider string) gin.HandlerFunc {
 			return
 		}
 
-		// 4. Issue Platform JWT
 		siteID := c.Request.Host
 		accessToken, refreshToken, err := CreateToken(user.Username, siteID)
 		if err != nil {
@@ -192,15 +187,12 @@ func OAuth2Callback(provider string) gin.HandlerFunc {
 			return
 		}
 
-		// 4.1 Log Auth Event
 		ip := c.ClientIP()
 		userAgent := c.Request.UserAgent()
 		event := fmt.Sprintf("oauth2_login_%s", provider)
-		// We need to resolve site_id UUID from host to log it correctly if possible
-		// For now we use the string or nil if not found easily
 		var siteUUID *string
 		var siteResults []database.Site
-		err = db.Select("SELECT id FROM core.sites WHERE host = $1", &siteResults, siteID)
+		err = db.Select("SELECT id FROM core.sites WHERE lower(host) = lower($1)", &siteResults, siteID)
 		if err == nil && len(siteResults) > 0 {
 			siteUUID = &siteResults[0].Id
 		}
@@ -217,7 +209,6 @@ func OAuth2Callback(provider string) gin.HandlerFunc {
 		c.SetCookie("refreshToken", refreshToken, expirationTimeSec, "/", "", !config.Server.Dev, true)
 		c.SetCookie("access_token", accessToken, accessTokenExpSec, "/", "", !config.Server.Dev, true)
 
-		// 5. Redirection or JSON response
 		next, err := c.Cookie("oauth_next")
 		if err == nil && next != "" {
 			c.SetCookie("oauth_next", "", -1, "/api/v1/auth", "", !config.Server.Dev, true)
@@ -225,12 +216,10 @@ func OAuth2Callback(provider string) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{
-			"message":      "Authentication successful",
-			"access_token": accessToken,
-			"user":         user.Username,
-			"site_id":      siteID,
-			"provider":     provider,
+		response := BuildLoginResponse(*user, provider)
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Data:    response,
 		})
 	}
 }
@@ -302,8 +291,6 @@ func fetchUserInfo(provider string, config *oauth2.Config, token *oauth2.Token) 
 			return nil, err
 		}
 
-		// GitHub might not return the email if it's private.
-		// A more robust implementation would call /user/emails
 		if githubUser.Email == "" {
 			emailResp, err := client.Get("https://api.github.com/user/emails")
 			if err == nil {
