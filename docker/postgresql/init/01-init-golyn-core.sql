@@ -54,6 +54,8 @@ CREATE TABLE auth.users (
                             password_hash   TEXT NOT NULL,
                             role            TEXT NOT NULL DEFAULT 'user', -- 'SuperAdmin', 'Admin', 'user'
                             status          TEXT NOT NULL DEFAULT 'active',
+                            theme           JSONB,
+                            permissions     JSONB,
                             created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
                             updated_at      TIMESTAMPTZ,
 
