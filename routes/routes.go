@@ -29,5 +29,5 @@ func ConfigureRoutes(router *gin.Engine, serverInfo *app.Info, mainDomain string
 	//  ====== ADMIN API ======
 	adminGroup := router.Group("/api/v1/admin", middlewares.RestrictAPIRequestMiddleware(dev))
 	adminGroup.Use(middlewares.AuthMiddleware(), middlewares.AdminMiddleware())
-	RegisterAdminRoutes(adminGroup)
+	RegisterAdminRoutes(adminGroup, serverInfo)
 }
