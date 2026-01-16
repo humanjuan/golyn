@@ -60,3 +60,13 @@ builds/*.gz
 /golyn
 /sites/golyn/
 /certificates/*
+/config/sites/futzy.conf
+/config/sites/ashcards.conf
+/config/sites/homer.conf
+/config/sites/hr.conf
+/config/sites/iOG26.conf
+/config/sites/kayak.conf
+/config/sites/leona.conf
+/config/sites/monitor.conf
+/config/sites/portal.humanjuan.conf
+/config/sites/valheim.conf
