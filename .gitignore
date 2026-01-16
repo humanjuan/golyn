@@ -50,6 +50,7 @@ builds/*.gz
 /sites/portal.humanjuan/
 /config/sites/futzy.humanjuan.conf
 /sites/valheim/
+/sites/golyn
 /sites/monitor/
 /sites/leona/
 /sites/futzy/
