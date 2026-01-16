@@ -27,6 +27,9 @@ go.work.sum
 # certificates
 *.pem
 
+# MAC
+.DS_Store
+
 # build
 *.gz
 builds/Golyn
