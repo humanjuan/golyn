@@ -1,5 +1,5 @@
 <h1 align="center">
-  Golyn <img src="https://github.com/humanjuan/golyn/blob/main/sites/golyn/assets/Golyn.png?raw=true" alt="Golyn Logo" width="80"> Server
+  Golyn <img src="https://humanjuan.com/assets/img/Golyn.webp?raw=true" alt="Golyn Logo" width="80"> Server
 </h1>
 
 ![Golang](https://img.shields.io/badge/Language-Go-blue?logo=go)
