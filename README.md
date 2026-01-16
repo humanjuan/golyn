@@ -215,6 +215,8 @@ To run **Golyn** correctly, especially in production environments, you need to d
 | `GITHUB_CLIENT_SECRET` | Client Secret for GitHub OAuth2. | `github_client_secret` |
 | `GITHUB_REDIRECT_URL` | Callback URL for GitHub OAuth2. | `https://your-domain.com/api/v1/auth/github/callback` |
 | `GOLYN_AI_SECRET` | Secret key for the Golyn-AI extension handshake. | Required if `golyn-ai` is enabled. |
+| `GOLYN_KEY_PHRASE` | Key phrase used as salt/integrity check for password encryption. | Used for AES-256-GCM credentials protection. |
+| `GOLYN_SECRET_KEY` | Master secret key for encrypting/decrypting sensitive data. | 32-character string for AES-256. |
 | `SMTP_SITE_PASS` | Encrypted SMTP password for a specific site. | Replace `SITE` with your site name (e.g., `SMTP_PORTFOLIO_PASS`). |
 
 > **Tip**: You can define these variables in a `.env` file at the project root or directly in your system's environment. Golyn will automatically expand these variables when they are referenced in the `.conf` files using the `${VARIABLE_NAME}` syntax.

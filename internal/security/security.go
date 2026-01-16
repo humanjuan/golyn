@@ -8,11 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 )
 
-const keyPhrase = "<key_phrase_>"
-const secretKey = "<secret_key_>"
+var (
+	keyPhrase = os.Getenv("GOLYN_KEY_PHRASE")
+	secretKey = os.Getenv("GOLYN_SECRET_KEY")
+)
 
 func EncryptPassword(password string) (string, error) {
 	key := []byte(secretKey)
