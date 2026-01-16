@@ -74,7 +74,7 @@ func GenerateCSRFToken(c *gin.Context) {
 		return
 	}
 	token := base64.StdEncoding.EncodeToString(tokenBytes)
-	c.SetCookie("csrf_token", token, int(time.Hour.Seconds()), "/", host, true, true)
+	c.SetCookie("csrf_token", token, int(time.Hour.Seconds()), "/", "", !globals.GetConfig().Server.Dev, false)
 	log.Debug("GenerateCSRFToken() | CSRF token generated for %s", host)
 	c.JSON(http.StatusOK, gin.H{
 		"csrf_token": token,

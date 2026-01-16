@@ -6,9 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"crypto/rand"
-	"encoding/base64"
-
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/humanjuan/golyn/database"
@@ -138,14 +135,6 @@ func Login() gin.HandlerFunc {
 		c.SetCookie("refreshToken", refreshToken, expirationTimeSec, "/", "", !config.Server.Dev, true)
 		c.SetCookie("access_token", accessToken, accessTokenExpSec, "/", "", !config.Server.Dev, true)
 
-		// Generate and set CSRF token
-		tokenBytes := make([]byte, 32)
-		if _, err := rand.Read(tokenBytes); err == nil {
-			csrfToken := base64.StdEncoding.EncodeToString(tokenBytes)
-			c.SetCookie("csrf_token", csrfToken, int(time.Hour.Seconds()), "/", "", !config.Server.Dev, true)
-			log.Debug("Login() | CSRF token generated and set for %s", siteID)
-		}
-
 		response := BuildLoginResponse(
 			user[0],
 			"",
@@ -203,10 +192,7 @@ func RefreshToken() gin.HandlerFunc {
 		c.SetCookie("refreshToken", newRefreshToken, expirationTimeSec, "/", "", !config.Server.Dev, true)
 		c.SetCookie("access_token", newAccessToken, accessTokenExpSec, "/", "", !config.Server.Dev, true)
 
-		c.JSON(http.StatusOK, utils.APIResponse{
-			Success: true,
-			Message: "Token refreshed successfully",
-		})
+		c.Status(http.StatusNoContent)
 	}
 }
 

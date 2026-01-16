@@ -23,7 +23,8 @@ This server is currently **under active development** and continues to expand wi
 ## Features
 
 ### Hosting Your Portfolio
-- The server is primarily designed to **host and serve my personal portfolio** and its dedicated administration panel. However, it also includes a **multi-site architecture**, allowing it to manage and host any additional websites, providing flexibility to support a variety of projects or domains under the same infrastructure.
+- The server is primarily designed to **host and serve my personal portfolio** and its dedicated administration panel. It includes a **multi-site architecture**, allowing it to manage and host any additional websites, providing flexibility to support a variety of projects or domains under the same infrastructure.
+- **Backend-owned Authentication**: Implements a highly secure authentication system using HttpOnly cookies, CSRF protection, and standardized DTOs, ensuring professional-grade security for all hosted sites.
 
 ### Multi-Site Hosting
 - Golyn Server is designed to handle multiple sites simultaneously. Each site is configurable and isolated, making it suitable for various use cases such as personal projects, portfolios, or other hosted websites.
@@ -107,10 +108,12 @@ Tokens issued by Golyn follow a minimal and strict claims structure, ensuring an
 
 ### Token Delivery & Security (Cookies)
 
-To mitigate risks like *Token Leakage* in URLs or logs, Golyn uses a cookie-based delivery mechanism:
+To mitigate risks like *Token Leakage* in URLs or logs, Golyn uses a strictly cookie-based delivery mechanism (**Backend-owned sessions**):
 
-- **`access_token`**: Stored in a cookie with `HttpOnly` and `Secure` attributes. The authentication middleware looks for it automatically if not provided in the `Authorization` header.
+- **`access_token`**: Stored in a cookie with `HttpOnly`, `Secure`, and `SameSite=Lax` attributes. The authentication middleware looks for it automatically.
 - **`refreshToken`**: Stored in an `HttpOnly` and `Secure` cookie, used exclusively to obtain new access tokens without requiring user intervention.
+
+> **Note**: Tokens are never included in the JSON response body to prevent access from malicious scripts (XSS). All authentication is handled transparently by the browser via secure cookies.
 
 ### Multi-provider OAuth2 (SSO Broker)
 
@@ -155,14 +158,14 @@ Golyn is designed with a "Security First" approach. Our production configuration
 
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
-| `/login` | `POST` | **Local Login**: Authenticate with username and password. |
-| `/logout` | `POST` | **Logout**: Revoke tokens and clear session cookies. |
-| `/refresh_token` | `POST` | **Token Refresh**: Obtain a new access token using a valid refresh token. |
+| `/login` | `POST` | **Local Login**: Authenticate (Sets secure cookies). |
+| `/logout` | `POST` | **Logout**: Revoke tokens and clear cookies. |
+| `/refresh_token` | `POST` | **Token Refresh**: Rotates cookies (Returns 204 No Content). |
 | `/auth/me` | `GET` | **Profile**: Get current authenticated user details. |
-| `/user/theme` | `GET/PUT` | **Theme**: Manage user interface preferences (sidebar, logo). |
-| `/auth/:provider/login`| `GET` | **OAuth2 Login**: Initiate SSO flow with Azure, Google or GitHub. |
-| `/csrf-token` | `GET` | **Security**: Obtain a fresh CSRF token for forms. |
-| `/send-mail` | `POST` | **Communication**: Send emails using site-specific SMTP (Rate limited). |
+| `/user/theme` | `GET/PUT` | **Theme**: Manage user interface preferences. |
+| `/auth/:provider/login`| `GET` | **OAuth2 Login**: Initiate SSO flow. |
+| `/csrf-token` | `GET` | **Security**: Obtain a fresh CSRF token (Required for mutable requests). |
+| `/send-mail` | `POST` | **Communication**: Send emails (Requires CSRF & Rate limited). |
 | `/ping` | `GET` | **Health Check**: Verify server status. |
 | `/version` | `GET` | **Version**: Current build information. |
 
@@ -277,7 +280,7 @@ if err == nil {
 
 ## Frontend Integration (TypeScript Example)
 
-This example shows how to interact with the Golyn JWT system from a TypeScript frontend. It handles the dual-token system: Access Token (in memory/local storage) and Refresh Token (secure HttpOnly cookie).
+This example shows how to interact with the Golyn **Backend-owned session** system from a TypeScript frontend. Since tokens are stored in secure cookies, the frontend doesn't need to manage JWTs in local storage.
 
 ### GolynAuthService.ts
 
@@ -310,11 +313,6 @@ interface LoginResponse {
   provider?: string;
 }
 
-interface RefreshResponse {
-  success: boolean;
-  message?: string;
-}
-
 class GolynAuthService {
   private static API_BASE = "https://your-golyn-domain.com/api/v1";
 
@@ -327,6 +325,8 @@ class GolynAuthService {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
+      // Important: Allow the browser to receive and store secure cookies
+      credentials: 'include' 
     });
 
     const result: APIResponse<LoginResponse> = await response.json();
@@ -340,8 +340,7 @@ class GolynAuthService {
 
   /**
    * Refreshes the tokens using the Refresh Token stored in the cookie.
-   * Requires 'credentials: include' to send the HttpOnly cookie.
-   * The server will set new cookies automatically.
+   * The server will rotate both cookies automatically.
    */
   static async refreshToken(): Promise<void> {
     const response = await fetch(`${this.API_BASE}/refresh_token`, {
@@ -349,19 +348,25 @@ class GolynAuthService {
       credentials: 'include', // Crucial to send the refreshToken cookie
     });
 
-    const result: APIResponse<RefreshResponse> = await response.json();
-
-    if (!result.success) {
+    if (response.status !== 204) {
       throw new Error("Session expired. Please login again.");
     }
   }
 
   /**
+   * Fetches a fresh CSRF token. Required for POST, PUT, DELETE.
+   */
+  static async getCSRFToken(): Promise<string> {
+    const response = await fetch(`${this.API_BASE}/csrf-token`, { credentials: 'include' });
+    const result = await response.json();
+    return result.csrf_token;
+  }
+
+  /**
    * Wrapper for authenticated fetch requests.
-   * Automatically handles 401 Unauthorized by attempting to refresh the token once.
+   * Automatically handles 401 Unauthorized by attempting to refresh the session.
    */
   static async authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
-    // Set credentials to include to send access_token cookie
     const fetchOptions = {
         ...options,
         credentials: 'include' as RequestCredentials
@@ -369,15 +374,13 @@ class GolynAuthService {
 
     let response = await fetch(url, fetchOptions);
 
-    // If 401, the access token might have expired. Try to refresh.
+    // If 401, the session might have expired. Try to refresh.
     if (response.status === 401) {
       try {
         await this.refreshToken();
-        // Retry the request
+        // Retry the original request
         response = await fetch(url, fetchOptions);
       } catch (err) {
-        // Refresh failed, user must login again
-        // window.location.href = "/login";
         throw new Error("Session expired");
       }
     }
@@ -386,28 +389,24 @@ class GolynAuthService {
   }
 
   /**
-   * Logout.
-   * Note: Golyn revokes tokens on the server and clears cookies.
+   * Logout. Clears session on server and removes cookies.
    */
   static async logout(): Promise<void> {
     await fetch(`${this.API_BASE}/logout`, {
       method: 'POST',
       credentials: 'include',
     });
-    this.accessToken = null;
-    // window.location.href = "/login";
   }
 }
 
 // Usage Example:
-// 1. Login
-// const user = await GolynAuthService.login("user@example.com", "password123");
-// console.log(`Welcome ${user.username}`);
-//
-// 2. Fetch Protected Data
-// const response = await GolynAuthService.authenticatedFetch("https://your-golyn-domain.com/api/v1/admin/stats");
-// const result: APIResponse<any> = await response.json();
-// if (result.success) { console.log(result.data); }
+// const user = await GolynAuthService.login("admin", "password");
+// const csrf = await GolynAuthService.getCSRFToken();
+// await GolynAuthService.authenticatedFetch("/api/v1/send-mail", {
+//    method: 'POST',
+//    headers: { 'X-CSRF-Token': csrf },
+//    body: formData 
+// });
 ```
 
 ---
