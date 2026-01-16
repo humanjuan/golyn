@@ -70,3 +70,5 @@ builds/*.gz
 /config/sites/monitor.conf
 /config/sites/portal.humanjuan.conf
 /config/sites/valheim.conf
+/test/var/
+/sites/hr/
