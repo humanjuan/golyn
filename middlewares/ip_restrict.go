@@ -9,8 +9,7 @@ import (
 	"strings"
 )
 
-// Allow API request just for humanJuan (Golyn it's multisite)
-
+// RestrictAPIRequestMiddleware ensures requests only come from allowed domains
 func RestrictAPIRequestMiddleware(dev bool) gin.HandlerFunc {
 	log := globals.GetAppLogger()
 	log.Debug("RestrictAPIRequestMiddleware() | dev: %v", dev)
@@ -26,7 +25,7 @@ func RestrictAPIRequestMiddleware(dev bool) gin.HandlerFunc {
 		for _, site := range config.Sites {
 			for _, domain := range site.Domains {
 				domain = strings.TrimSpace(domain)
-				if host == domain {
+				if strings.ToLower(host) == strings.ToLower(domain) {
 					allowed = true
 					break
 				}
@@ -36,7 +35,7 @@ func RestrictAPIRequestMiddleware(dev bool) gin.HandlerFunc {
 					if !strings.HasSuffix(devDomain, ".local") {
 						devDomain = devDomain + ".local"
 					}
-					if host == devDomain {
+					if strings.ToLower(host) == strings.ToLower(devDomain) {
 						allowed = true
 						break
 					}

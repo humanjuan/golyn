@@ -8,9 +8,9 @@ import (
 
 func Ping(c *gin.Context) {
 	// TEST API
-	c.IndentedJSON(http.StatusOK, gin.H{
-		"message": utils.GetCodeMessage(http.StatusOK),
-		"data":    "pong",
+	c.JSON(http.StatusOK, utils.APIResponse{
+		Success: true,
+		Message: "pong",
 	})
 	return
 }

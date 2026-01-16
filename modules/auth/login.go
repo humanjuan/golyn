@@ -1,9 +1,9 @@
 package auth
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -33,13 +33,18 @@ func Login() gin.HandlerFunc {
 			return
 		}
 
+		effectiveUsername := strings.ToLower(loginUser.Username)
+		if effectiveUsername == "" {
+			effectiveUsername = strings.ToLower(loginUser.Name)
+		}
+
 		db := globals.GetDBInstance()
 		var user []database.User
 
 		var attempts = 0
 
-		logDB.Debug("Login() | query: %v | args: %v", database.Queries["login"], loginUser.Name)
-		err := db.Select(database.Queries["login"], &user, loginUser.Name)
+		logDB.Debug("Login() | query: %v | args: %v", database.Queries["login"], effectiveUsername)
+		err := db.Select(database.Queries["login"], &user, effectiveUsername)
 		if err != nil {
 			logDB.Error("Login() | An error has occurred in the database. Try again later: %s", err.Error())
 			err = fmt.Errorf("an error has occurred in the database. Try again later")
@@ -49,7 +54,7 @@ func Login() gin.HandlerFunc {
 		}
 
 		if user == nil || len(user) == 0 {
-			// verify cache
+			// update cache attempts
 			if attempt, found := _cache.Get(c.ClientIP()); found {
 				attempts = attempt.(int)
 				attempts++
@@ -59,7 +64,7 @@ func Login() gin.HandlerFunc {
 				_cache.Set(c.ClientIP(), attempts, cache.DefaultExpiration)
 			}
 			log.Warn("Login() | ClientIP: %s | User: %s (Not Found)| Login: Failed | Attempts: %d | Sleep: 5s | Cache Items: %d",
-				c.ClientIP(), loginUser.Name, attempts, _cache.ItemCount())
+				c.ClientIP(), effectiveUsername, attempts, _cache.ItemCount())
 			time.Sleep(5 * time.Second)
 
 			err = fmt.Errorf("login failed")
@@ -71,7 +76,7 @@ func Login() gin.HandlerFunc {
 		err = bcrypt.CompareHashAndPassword([]byte(user[0].PasswordHash), []byte(loginUser.Password))
 
 		if err != nil {
-			// verify cache
+			// update cache attempts
 			if attempt, found := _cache.Get(c.ClientIP()); found {
 				attempts = attempt.(int)
 				attempts++
@@ -81,7 +86,7 @@ func Login() gin.HandlerFunc {
 				_cache.Set(c.ClientIP(), attempts, cache.DefaultExpiration)
 			}
 			log.Error("Login() | ClientIP: %s | User: %s | Login: Failed | Attempts: %d | Sleep: 5s | Cache Items: %d",
-				c.ClientIP(), loginUser.Name, attempts, _cache.ItemCount())
+				c.ClientIP(), effectiveUsername, attempts, _cache.ItemCount())
 			time.Sleep(5 * time.Second)
 
 			err = fmt.Errorf("login failed")
@@ -99,10 +104,10 @@ func Login() gin.HandlerFunc {
 		}
 
 		log.Info("ClientIP: %s | User: %s | Login: Success | Attempts: %v | Sleep: 0s | Cache Items: %d",
-			c.ClientIP(), loginUser.Name, attempts, _cache.ItemCount())
+			c.ClientIP(), effectiveUsername, attempts, _cache.ItemCount())
 
 		siteID := c.Request.Host
-		accessToken, refreshToken, err := CreateToken(loginUser.Name, siteID)
+		accessToken, refreshToken, err := CreateToken(effectiveUsername, siteID)
 		if err != nil {
 			log.Error("Login() | An error has occurred in the server when trying to get access tokens. Try again later: %s", err.Error())
 			err = fmt.Errorf("an error has occurred in the server when trying to get access tokens")
@@ -112,35 +117,32 @@ func Login() gin.HandlerFunc {
 		}
 
 		user[0].PasswordHash = ""
-		jsonUser, err := json.Marshal(user[0])
-		if err != nil {
-			log.Error("Login() | An error has occurred in the server when trying to build the final user object. Try again later: %s", err.Error())
-			err = fmt.Errorf("an error has occurred in the server when trying to build the final user object")
-			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
-			c.Abort()
-			return
-		}
 
 		ip := c.ClientIP()
 		userAgent := c.Request.UserAgent()
-		event := "local_login"
 		var siteUUID *string
 		var siteResults []database.Site
-		err = db.Select("SELECT id FROM core.sites WHERE host = $1", &siteResults, siteID)
+		err = db.Select("SELECT id FROM core.sites WHERE lower(host) = lower($1)", &siteResults, siteID)
 		if err == nil && len(siteResults) > 0 {
 			siteUUID = &siteResults[0].Id
 		}
-		_ = db.RegisterAuthEvent(&user[0].Id, siteUUID, event, ip, userAgent)
+		_ = db.RegisterAuthEvent(&user[0].Id, siteUUID, "local_login", ip, userAgent)
 
 		expirationTimeSec := config.Server.TokenExpirationRefreshTime * 60
+		accessTokenExpSec := config.Server.TokenExpirationTime * 60
+
 		c.SetSameSite(http.SameSiteLaxMode)
 		c.SetCookie("refreshToken", refreshToken, expirationTimeSec, "/", "", !config.Server.Dev, true)
-		c.IndentedJSON(http.StatusOK, gin.H{
-			"message":      utils.GetCodeMessage(http.StatusOK),
-			"data":         string(jsonUser),
-			"access_token": accessToken,
+		c.SetCookie("access_token", accessToken, accessTokenExpSec, "/", "", !config.Server.Dev, true)
+
+		response := BuildLoginResponse(
+			user[0],
+			"",
+		)
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Data:    response,
 		})
-		return
 	}
 }
 
@@ -184,12 +186,13 @@ func RefreshToken() gin.HandlerFunc {
 		}
 
 		expirationTimeSec := config.Server.TokenExpirationRefreshTime * 60
+		accessTokenExpSec := config.Server.TokenExpirationTime * 60
+
 		c.SetSameSite(http.SameSiteLaxMode)
 		c.SetCookie("refreshToken", newRefreshToken, expirationTimeSec, "/", "", !config.Server.Dev, true)
+		c.SetCookie("access_token", newAccessToken, accessTokenExpSec, "/", "", !config.Server.Dev, true)
 
-		c.JSON(http.StatusOK, gin.H{
-			"access_token": newAccessToken,
-		})
+		c.Status(http.StatusNoContent)
 	}
 }
 
@@ -203,11 +206,10 @@ func Logout() gin.HandlerFunc {
 		if err == nil && refreshToken != "" {
 			claims, err := ValidateRefreshToken(refreshToken)
 			if err == nil {
-				// We need the user UUID. CreateToken uses username (subject) to find ID.
 				var users []struct {
 					ID string `db:"id"`
 				}
-				err = db.Select("SELECT id FROM auth.users WHERE username = $1", &users, claims.Subject)
+				err = db.Select("SELECT id FROM auth.users WHERE lower(username) = lower($1)", &users, claims.Subject)
 				if err == nil && len(users) > 0 {
 					_ = db.RevokeAllUserRefreshTokens(users[0].ID)
 					log.Debug("Logout() | Revoked tokens for user: %s", claims.Subject)
@@ -224,8 +226,9 @@ func Logout() gin.HandlerFunc {
 
 		log.Info("Logout() | User logged out and cookies cleared | ClientIP: %s", c.ClientIP())
 
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Successfully logged out",
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: "Successfully logged out",
 		})
 	}
 }

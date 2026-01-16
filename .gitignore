@@ -27,6 +27,9 @@ go.work.sum
 # certificates
 *.pem
 
+# MAC
+.DS_Store
+
 # build
 *.gz
 builds/Golyn
@@ -42,30 +45,33 @@ builds/*.gz
 /pkg/sumdb/
 .idea/
 .DS_Store
-**/.DS_Store
-/certificates/portfolio/
-/certificates/golyn/
-/certificates/kayak/
-/certificates/leona/
-/certificates/portal.golyn/
+/certificates/*
 /docker/taiga/
 /builds/Golyn/
 /certificates/homer/
 /sites/homer/
 /sites/portal.humanjuan/
-/certificates/portal.humanjuan/
 /config/sites/futzy.humanjuan.conf
 /sites/valheim/
+/sites/golyn
 /sites/monitor/
 /sites/leona/
 /sites/futzy/
 /sites/rioclaro/
 /sites/ashcards/
-/certificates/valheim/
-/certificates/rioclaro/
-/certificates/monitor/
-/certificates/ashcards/
-/certificates/futzy/
-/certificates/iOG26/
 /sites/iOG26/
 /golyn
+/sites/golyn/
+/certificates/*
+/config/sites/futzy.conf
+/config/sites/ashcards.conf
+/config/sites/homer.conf
+/config/sites/hr.conf
+/config/sites/iOG26.conf
+/config/sites/kayak.conf
+/config/sites/leona.conf
+/config/sites/monitor.conf
+/config/sites/portal.humanjuan.conf
+/config/sites/valheim.conf
+/test/var/
+/sites/hr/

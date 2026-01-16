@@ -269,14 +269,15 @@ func LoadConfig() (*Config, error) {
 }
 
 func expandEnv(val string) string {
-	if len(val) > 3 && val[0:2] == "${" && val[len(val)-1] == '}' {
+	val = strings.TrimSpace(val)
+	if len(val) > 3 && strings.HasPrefix(val, "${") && strings.HasSuffix(val, "}") {
 		envVar := val[2 : len(val)-1]
 		expandedVal := os.Getenv(envVar)
 		if expandedVal != "" {
 			return expandedVal
 		}
 	}
-	return val
+	return os.ExpandEnv(val)
 }
 
 func loadSiteConfig(name string, path string, basePath string, server Server) (SiteConfig, error) {

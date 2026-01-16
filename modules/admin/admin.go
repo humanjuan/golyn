@@ -1,7 +1,9 @@
 package admin
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/humanjuan/golyn/database"
@@ -33,6 +35,8 @@ func CreateSite() gin.HandlerFunc {
 		}
 
 		db := globals.GetDBInstance()
+		req.Key = strings.ToLower(req.Key)
+		req.Host = strings.ToLower(req.Host)
 		err := db.CreateSite(req.Key, req.Host)
 		if err != nil {
 			log.Error("Admin.CreateSite() | Failed to create site: %v", err)
@@ -41,7 +45,10 @@ func CreateSite() gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusCreated, gin.H{"message": "site created successfully"})
+		c.JSON(http.StatusCreated, utils.APIResponse{
+			Success: true,
+			Message: "site created successfully",
+		})
 	}
 }
 
@@ -54,7 +61,80 @@ func ListSites() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		c.JSON(http.StatusOK, sites)
+
+		dtos := make([]SiteDTO, len(sites))
+		for i, s := range sites {
+			dtos[i] = MapSiteToDTO(s)
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Data:    dtos,
+		})
+	}
+}
+
+func DeleteSite() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := globals.GetAppLogger()
+		key := strings.ToLower(c.Param("key"))
+		if key == "" {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "site key is required"))
+			c.Abort()
+			return
+		}
+
+		db := globals.GetDBInstance()
+		err := db.DeleteSite(key)
+		if err != nil {
+			log.Error("Admin.DeleteSite() | Failed to delete site: %v", err)
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to delete site"))
+			c.Abort()
+			return
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: "site deleted successfully",
+		})
+	}
+}
+
+type UpdateSiteStatusRequest struct {
+	Status string `json:"status" binding:"required"`
+}
+
+func UpdateSiteStatus() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := globals.GetAppLogger()
+		key := strings.ToLower(c.Param("key"))
+		if key == "" {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "site key is required"))
+			c.Abort()
+			return
+		}
+
+		var req UpdateSiteStatusRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "invalid request body"))
+			c.Abort()
+			return
+		}
+
+		db := globals.GetDBInstance()
+		req.Status = strings.ToLower(req.Status)
+		err := db.UpdateSiteStatus(key, req.Status)
+		if err != nil {
+			log.Error("Admin.UpdateSiteStatus() | Failed to update site status: %v", err)
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to update site status"))
+			c.Abort()
+			return
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: "site status updated successfully",
+		})
 	}
 }
 
@@ -69,6 +149,9 @@ func CreateUser() gin.HandlerFunc {
 		}
 
 		db := globals.GetDBInstance()
+		req.SiteKey = strings.ToLower(req.SiteKey)
+		req.Username = strings.ToLower(req.Username)
+		req.Role = strings.ToLower(req.Role)
 		site, err := db.GetSiteByKey(req.SiteKey)
 		if err != nil || site == nil {
 			c.Error(utils.NewHTTPError(http.StatusNotFound, "site not found"))
@@ -89,7 +172,10 @@ func CreateUser() gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusCreated, gin.H{"message": "user created successfully"})
+		c.JSON(http.StatusCreated, utils.APIResponse{
+			Success: true,
+			Message: "user created successfully",
+		})
 	}
 }
 
@@ -119,11 +205,128 @@ func ListUsers() gin.HandlerFunc {
 			return
 		}
 
-		// Clear password hashes from response
-		for i := range users {
-			users[i].PasswordHash = ""
+		dtos := make([]AdminUserDTO, len(users))
+		for i, u := range users {
+			dtos[i] = MapAdminUserToDTO(u)
 		}
 
-		c.JSON(http.StatusOK, users)
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Data:    dtos,
+		})
+	}
+}
+
+func DeleteUser() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := globals.GetAppLogger()
+		username := strings.ToLower(c.Param("username"))
+		if username == "" {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "username is required"))
+			c.Abort()
+			return
+		}
+
+		db := globals.GetDBInstance()
+		err := db.DeleteUser(username)
+		if err != nil {
+			log.Error("Admin.DeleteUser() | Failed to delete user: %v", err)
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to delete user"))
+			c.Abort()
+			return
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: "user deleted successfully",
+		})
+	}
+}
+
+func UpdateUserStatus() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := globals.GetAppLogger()
+		username := strings.ToLower(c.Param("username"))
+		if username == "" {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "username is required"))
+			c.Abort()
+			return
+		}
+
+		var req struct {
+			Status string `json:"status" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "invalid request body"))
+			c.Abort()
+			return
+		}
+
+		// Basic validation of status
+		validStatus := map[string]bool{"active": true, "inactive": true, "pending": true}
+		if !validStatus[req.Status] {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "invalid status value"))
+			c.Abort()
+			return
+		}
+
+		db := globals.GetDBInstance()
+		err := db.UpdateUserStatus(username, req.Status)
+		if err != nil {
+			log.Error("Admin.UpdateUserStatus() | Failed to update user status: %v", err)
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to update user status"))
+			c.Abort()
+			return
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: "user status updated successfully",
+		})
+	}
+}
+
+func UpdateUserRole() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := globals.GetAppLogger()
+		// Only SuperAdmin can change roles
+		roleVal, _ := c.Get("role")
+		role := strings.ToLower(fmt.Sprintf("%v", roleVal))
+		if role != "superadmin" {
+			log.Warn("Admin.UpdateUserRole() | Access denied | User: %s | Role: %v", c.GetString("subject"), role)
+			c.Error(utils.NewHTTPError(http.StatusForbidden, "insufficient privileges"))
+			c.Abort()
+			return
+		}
+
+		username := strings.ToLower(c.Param("username"))
+		if username == "" {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "username is required"))
+			c.Abort()
+			return
+		}
+
+		var req struct {
+			Role string `json:"role" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "invalid request body"))
+			c.Abort()
+			return
+		}
+
+		db := globals.GetDBInstance()
+		err := db.UpdateUserRole(username, req.Role)
+		if err != nil {
+			log.Error("Admin.UpdateUserRole() | Failed to update user role: %v", err)
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to update user role"))
+			c.Abort()
+			return
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: "user role updated successfully",
+		})
 	}
 }

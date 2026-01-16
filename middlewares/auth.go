@@ -19,11 +19,13 @@ func AuthMiddleware() gin.HandlerFunc {
 		clientIP := c.ClientIP()
 		userAgent := c.GetHeader("User-Agent")
 		host := c.Request.Host
+		config := globals.GetConfig()
 
 		authHeader := c.GetHeader("Authorization")
 		var tokenString string
 
-		if authHeader != "" {
+		// Use Authorization header only in development mode
+		if config.Server.Dev && authHeader != "" {
 			headerParts := strings.Split(authHeader, " ")
 			if len(headerParts) != 2 || strings.ToLower(headerParts[0]) != "bearer" {
 				log.Error("AuthMiddleware() | Invalid token format | ClientIP: %s | Host: %v | User Agent: %s", clientIP, host, userAgent)
@@ -35,7 +37,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			}
 			tokenString = headerParts[1]
 		} else {
-			// Try to get token from cookie
+			// In production, force the use of HttpOnly cookies
 			cookieToken, err := c.Cookie("access_token")
 			if err != nil {
 				log.Error("AuthMiddleware() | Missing token | ClientIP: %s | Host: %v | User Agent: %s", clientIP, host, userAgent)

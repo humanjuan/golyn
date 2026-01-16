@@ -33,9 +33,10 @@ func CustomErrorHandler() gin.HandlerFunc {
 			isAPI := strings.HasPrefix(c.Request.URL.Path, "/api/")
 
 			if isAPI || !globals.RenderTemplate {
-				c.IndentedJSON(status, gin.H{
-					"message": message,
-					"error":   utils.GetCodeMessage(status),
+				c.JSON(status, utils.APIResponse{
+					Success: false,
+					Message: message,
+					Error:   utils.GetCodeMessage(status),
 				})
 			} else {
 				c.Writer.Header().Set("X-Request-Path", c.Request.URL.Path)

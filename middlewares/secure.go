@@ -28,11 +28,63 @@ func SecureMiddleware(isDev bool) gin.HandlerFunc {
 		IsDevelopment:        isDev,
 		ReferrerPolicy:       "strict-origin-when-cross-origin",
 		ContentSecurityPolicy: "default-src 'self'; " +
-			"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://code.jquery.com https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://apis.google.com https://accounts.google.com; " +
-			"style-src 'self' 'unsafe-inline' https://stackpath.bootstrapcdn.com https://fonts.googleapis.com https://cdn.jsdelivr.net; " +
-			"font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; " +
-			"connect-src 'self' https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com https://www.googleapis.com https://graph.microsoft.com https://login.microsoftonline.com https://*.amazonaws.com; " +
-			"img-src 'self' data: https://humanjuan.com https://www.humanjuan.com https://golyn.humanjuan.com https://cdn.jsdelivr.net https://lh3.googleusercontent.com https://*.amazonaws.com;",
+			// Scripts (OAuth, CDNs, modern frameworks)
+			"script-src 'self' 'unsafe-inline' 'unsafe-eval' " +
+			"https://code.jquery.com " +
+			"https://cdn.jsdelivr.net " +
+			"https://cdn.tailwindcss.com " +
+			"https://apis.google.com " +
+			"https://accounts.google.com " +
+			"https://login.microsoftonline.com; " +
+
+			// Styles (Google Fonts, Tailwind CDN, Bootstrap)
+			"style-src 'self' 'unsafe-inline' " +
+			"https://fonts.googleapis.com " +
+			"https://cdn.jsdelivr.net " +
+			"https://stackpath.bootstrapcdn.com; " +
+
+			// Fonts
+			"font-src 'self' data: " +
+			"https://fonts.gstatic.com " +
+			"https://cdn.jsdelivr.net; " +
+
+			// Connections (APIs, OAuth, AWS, icons)
+			"connect-src 'self' " +
+			"https://www.googleapis.com " +
+			"https://graph.microsoft.com " +
+			"https://login.microsoftonline.com " +
+			"https://api.iconify.design " +
+			"https://api.simplesvg.com " +
+			"https://api.unisvg.com " +
+			"https://*.amazonaws.com; " +
+
+			// Images (CDNs, OAuth avatars, multisite)
+			"img-src 'self' data: blob: " +
+			"https://*.googleusercontent.com " +
+			"https://*.amazonaws.com " +
+			"https://cdn.jsdelivr.net " +
+			"https://*.humanjuan.com; " +
+
+			// Frames (external login)
+			"frame-src 'self' " +
+			"https://accounts.google.com " +
+			"https://login.microsoftonline.com; " +
+
+			// Forms (OAuth callbacks)
+			"form-action 'self' " +
+			"https://accounts.google.com " +
+			"https://login.microsoftonline.com; " +
+
+			// Workers (modern apps)
+			"worker-src 'self' blob:; " +
+
+			// Media (videos, audio)
+			"media-src 'self' blob:; " +
+
+			// Additional security
+			"base-uri 'self'; " +
+			"object-src 'none'; " +
+			"frame-ancestors 'self';",
 	}
 
 	return func(c *gin.Context) {
@@ -66,6 +118,13 @@ func SecureMiddleware(isDev bool) gin.HandlerFunc {
 		}
 
 		if c.Request.TLS == nil && hasCert && !isInvalid {
+			// Do not redirect to HTTPS for API paths
+			if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+				log.Debug("SecureMiddleware() | Skipping HTTPS redirection for API path | Host: %s | Path: %s", host, c.Request.URL.Path)
+				c.Next()
+				return
+			}
+
 			redirURL := fmt.Sprintf("https://%s%s", host, c.Request.URL.Path)
 			c.Redirect(http.StatusMovedPermanently, redirURL)
 			log.Debug("SecureMiddleware() | Redirecting to HTTPS for host %s | Path: %s", host, c.Request.URL.Path)

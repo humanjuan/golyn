@@ -77,9 +77,9 @@ func Version(serverInfo *app.Info) gin.HandlerFunc {
 		data["certDateIssue"] = cert.NotBefore
 		data["certExpirationDay"] = cert.NotAfter
 
-		c.IndentedJSON(http.StatusOK, gin.H{
-			"message": utils.GetCodeMessage(http.StatusOK),
-			"data":    data,
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Data:    data,
 		})
 		return
 	}
