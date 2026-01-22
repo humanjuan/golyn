@@ -5,6 +5,16 @@ import (
 	"strings"
 )
 
+// IsFileCompressed reports whether a file path ends with a known compression extension.
+// This is used to decide whether a pre-compressed asset is being served.
+func IsFileCompressed(filePath string) bool {
+	lower := strings.ToLower(filePath)
+	return strings.HasSuffix(lower, ".br") ||
+		strings.HasSuffix(lower, ".gz") ||
+		strings.HasSuffix(lower, ".zz") ||
+		strings.HasSuffix(lower, ".deflate")
+}
+
 var AllowedExtensions = map[string]string{
 	".css":   "text/css",
 	".js":    "application/javascript",
@@ -15,6 +25,9 @@ var AllowedExtensions = map[string]string{
 	".svg":   "image/svg+xml",
 	".webp":  "image/webp",
 	".gif":   "image/gif",
+	".json":  "application/json",
+	".map":   "application/octet-stream",
+	".wasm":  "application/wasm",
 	".woff":  "font/woff",
 	".woff2": "font/woff2",
 	".ttf":   "font/ttf",
