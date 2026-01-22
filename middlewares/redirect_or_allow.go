@@ -2,13 +2,14 @@ package middlewares
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/humanjuan/golyn/globals"
-	"github.com/humanjuan/golyn/internal/utils"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/humanjuan/golyn/globals"
+	"github.com/humanjuan/golyn/internal/utils"
 )
 
 func RedirectOrAllowHostMiddleware() gin.HandlerFunc {
@@ -17,6 +18,10 @@ func RedirectOrAllowHostMiddleware() gin.HandlerFunc {
 	virtualHosts := globals.VirtualHosts
 
 	return func(c *gin.Context) {
+		if c.IsAborted() {
+			return
+		}
+
 		hostName := c.Request.Host
 		hostParts := strings.Split(hostName, ":")
 		if len(hostParts) > 0 {
@@ -45,9 +50,14 @@ func RedirectOrAllowHostMiddleware() gin.HandlerFunc {
 			}
 
 			sitePath := filepath.Clean(vh.BasePath)
-			requestedFile := filepath.Clean(filepath.Join(sitePath, c.Request.URL.Path))
+			urlPath := strings.TrimPrefix(c.Request.URL.Path, "/")
+			requestedFile := filepath.Clean(filepath.Join(sitePath, urlPath))
 
-			if !strings.HasPrefix(requestedFile, sitePath) {
+			sitePathWithSep := sitePath
+			if !strings.HasSuffix(sitePathWithSep, string(filepath.Separator)) {
+				sitePathWithSep += string(filepath.Separator)
+			}
+			if !strings.HasPrefix(requestedFile+string(filepath.Separator), sitePathWithSep) {
 				log.Error("redirectOrAllowHostMiddleware() | Path Traversal Attempt | Host: %s | Path: %s | ResolvedPath: %s",
 					hostName, c.Request.URL.Path, requestedFile)
 				log.Sync()
@@ -60,50 +70,25 @@ func RedirectOrAllowHostMiddleware() gin.HandlerFunc {
 			log.Debug("redirectOrAllowHostMiddleware() | Serving Virtual Host Content | Host: %s | RequestedFile: %s",
 				hostName, requestedFile)
 
-			allowedExtensions := map[string]string{
-				".css":   "text/css",
-				".js":    "application/javascript",
-				".png":   "image/png",
-				".jpg":   "image/jpeg",
-				".jpeg":  "image/jpeg",
-				".gif":   "image/gif",
-				".ico":   "image/x-icon",
-				".svg":   "image/svg+xml",
-				".webp":  "image/webp",
-				".html":  "text/html; charset=utf-8",
-				".json":  "application/json",
-				".txt":   "text/plain; charset=utf-8",
-				".xml":   "application/xml",
-				".map":   "application/octet-stream",
-				".woff":  "font/woff",
-				".woff2": "font/woff2",
-				".wasm":  "application/wasm",
-			}
-
-			// Case 1: Physical file exists -> serve it with proper headers
 			if fi, err := os.Stat(requestedFile); err == nil && !fi.IsDir() {
-				extension := filepath.Ext(requestedFile)
-				if contentType, ok := allowedExtensions[extension]; ok {
-					c.Header("Content-Type", contentType)
+				if contentType, ok := utils.GetAllowedMime(requestedFile); ok {
+					c.Writer.Header().Set("Content-Type", contentType)
 				}
-				c.Header("X-Content-Type-Options", "nosniff")
-				c.Header("X-Frame-Options", "DENY")
 				c.File(requestedFile)
 				c.Abort()
 				return
 			}
 
-			// Case 2: No physical file -> SPA fallback for routes without extension
 			spaIndex := filepath.Join(sitePath, "index.html")
 			pathHasExt := strings.Contains(c.Request.URL.Path, ".")
 			if !pathHasExt {
 				if fi, err := os.Stat(spaIndex); err == nil && !fi.IsDir() {
-					c.Header("Content-Type", "text/html; charset=utf-8")
+					c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 					c.File(spaIndex)
 					c.Abort()
 					return
 				}
-				// index.html missing -> 404
+
 				err := fmt.Errorf("SPA index not found: %s", spaIndex)
 				c.Error(utils.NewHTTPError(http.StatusNotFound, err.Error()))
 				c.Abort()
@@ -118,7 +103,7 @@ func RedirectOrAllowHostMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Host not configured
+		// Host isn't configured
 		log.Warn("redirectOrAllowHostMiddleware() | Host Not Configured | Host: %s | Path: %s", hostName, c.Request.URL.Path)
 		err := fmt.Errorf("the requested route does not exist: %s", c.Request.URL.Path)
 		c.Error(utils.NewHTTPError(http.StatusNotFound, err.Error()))

@@ -1,12 +1,13 @@
 package middlewares
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/humanjuan/golyn/globals"
-	"github.com/humanjuan/golyn/internal/utils"
 	"net/http"
 	"path/filepath"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/humanjuan/golyn/globals"
+	"github.com/humanjuan/golyn/internal/utils"
 )
 
 type CompressionType struct {
@@ -18,56 +19,69 @@ type CompressionType struct {
 var CompressionTypes = []CompressionType{
 	{Name: "br", Extension: ".br"},
 	{Name: "zstd", Extension: ".zst"},
-	{Name: "gzip", Extension: ".gzip"},
+	{Name: "gzip", Extension: ".gz"},
 	{Name: "deflate", Extension: ".deflate"},
 	{Name: "", Extension: ""},
 }
 
 func CompressionMiddleware() gin.HandlerFunc {
-	log := globals.GetAppLogger()
-	log.Debug("CompressionMiddleware()")
-	virtualHosts := globals.VirtualHosts
 	return func(c *gin.Context) {
-		if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
-			c.Next()
+		if c.IsAborted() {
 			return
 		}
-
-		host := c.Request.Host
+		virtualHosts := globals.VirtualHosts
+		host := strings.Split(c.Request.Host, ":")[0]
 		virtualHost, ok := virtualHosts[host]
 		if !ok {
 			c.Next()
 			return
 		}
 
+		if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
+			c.Next()
+			return
+		}
+
 		requestPath := c.Request.URL.Path
 		cleanPath := strings.TrimPrefix(requestPath, "/")
-		siteName := filepath.Base(virtualHost.BasePath)
 
-		// Relative Path
-		relativePath := strings.TrimPrefix(cleanPath, siteName)
+		// Relative Path calculation
+		siteName := filepath.Base(virtualHost.BasePath)
+		var relativePath string
+		if strings.HasPrefix(cleanPath, siteName+"/") || cleanPath == siteName {
+			relativePath = strings.TrimPrefix(cleanPath, siteName)
+		} else {
+			relativePath = cleanPath
+		}
 		relativePath = strings.TrimPrefix(relativePath, "/")
 		if relativePath == "" {
 			relativePath = "index.html"
 		}
 
 		acceptEncoding := c.GetHeader("Accept-Encoding")
-		c.Header("Vary", "Accept-Encoding")
+		{
+			existing := c.Writer.Header().Get("Vary")
+			if existing == "" {
+				c.Writer.Header().Set("Vary", "Accept-Encoding")
+			} else if !strings.Contains(strings.ToLower(existing), "accept-encoding") {
+				c.Writer.Header().Set("Vary", existing+", Accept-Encoding")
+			}
+		}
 		contentType := utils.GetMimeTypeFromCompressedFilePath(relativePath)
 
 		// Priority Order: Brotli > Zstd > Gzip > Deflate > Normal
 		for _, compression := range CompressionTypes {
-			if strings.Contains(acceptEncoding, compression.Name) && FileExistsCached(c, siteName, relativePath, compression.Name) {
-				fullPath := filepath.Join(virtualHost.BasePath, relativePath) + compression.Extension
-				if utils.FileOrDirectoryExists(fullPath) {
-					c.Header("Content-Type", contentType)
-					if compression.Name != "" {
-						c.Header("Content-Encoding", compression.Name)
+			if compression.Name != "" && strings.Contains(acceptEncoding, compression.Name) {
+				if FileExistsCached(c, siteName, relativePath, compression.Name) {
+					fullPath := filepath.Join(virtualHost.BasePath, relativePath) + compression.Extension
+					if utils.FileOrDirectoryExists(fullPath) {
+						// Set headers and serve compressed file
+						c.Writer.Header().Set("Content-Type", contentType)
+						c.Writer.Header().Set("Content-Encoding", compression.Name)
+						c.File(fullPath)
+						c.Abort()
+						return
 					}
-					c.Header("Content-Type", contentType)
-					c.File(fullPath)
-					c.Abort()
-					return
 				}
 			}
 		}
@@ -77,7 +91,7 @@ func CompressionMiddleware() gin.HandlerFunc {
 			fullPath := filepath.Join(virtualHost.BasePath, relativePath)
 			if utils.FileOrDirectoryExists(fullPath) {
 				contentType := utils.GetMimeTypeFromCompressedFilePath(relativePath)
-				c.Header("Content-Type", contentType)
+				c.Writer.Header().Set("Content-Type", contentType)
 				c.File(fullPath)
 				c.Abort()
 				return

@@ -40,10 +40,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/humanjuan/acacia/v2"
 	"github.com/humanjuan/golyn/app"
 	"github.com/humanjuan/golyn/config/loaders"
 	"github.com/humanjuan/golyn/database"
@@ -59,16 +59,21 @@ func TestAdminAPI(t *testing.T) {
 	// Setup Environment
 	if os.Getenv("GOLYN_BASE_PATH") == "" {
 		cwd, _ := os.Getwd()
-		os.Setenv("GOLYN_BASE_PATH", cwd)
+		base := cwd
+		if filepath.Base(base) == "test" {
+			base = filepath.Dir(base)
+		}
+		os.Setenv("GOLYN_BASE_PATH", base)
 	}
 
-	log, _ := acacia.Start("test_admin_api.log", "./var/log", "DEBUG")
+	logDir := t.TempDir()
+	log, err := loaders.InitLog("test_admin_api", logDir, "debug", 5, 1, false)
+	if err != nil {
+		t.Fatalf("failed to init logger: %v", err)
+	}
 	globals.SetAppLogger(log)
 	globals.SetDBLogger(log)
-	defer func() {
-		log.Close()
-		os.Remove("./var/log/test_admin_api.log")
-	}()
+	t.Cleanup(func() { log.Close() })
 
 	conf, err := loaders.LoadConfig()
 	if err != nil {
@@ -92,6 +97,26 @@ func TestAdminAPI(t *testing.T) {
 
 	serverInfo := &app.Info{ServerVersion: "test-admin"}
 	routes.ConfigureRoutes(router, serverInfo, "humanjuan.com", true)
+
+	// Helper function to assert platform security headers
+	assertSecurityHeaders := func(t *testing.T, w *httptest.ResponseRecorder) {
+		t.Helper()
+		if w.Header().Get("X-Content-Type-Options") != "nosniff" {
+			t.Error("Missing or invalid X-Content-Type-Options header")
+		}
+		if w.Header().Get("X-Frame-Options") != "DENY" {
+			t.Error("Missing or invalid X-Frame-Options header")
+		}
+		if w.Header().Get("Content-Security-Policy") == "" {
+			t.Error("Missing Content-Security-Policy header")
+		}
+		if w.Header().Get("Cross-Origin-Embedder-Policy") != "require-corp" {
+			t.Error("Missing or invalid Cross-Origin-Embedder-Policy header")
+		}
+		if w.Header().Get("Server") != "" {
+			t.Errorf("Server header should be hidden, got: %s", w.Header().Get("Server"))
+		}
+	}
 
 	// Admin Credentials
 	adminUser := "superadmin@test.local"
@@ -137,6 +162,7 @@ func TestAdminAPI(t *testing.T) {
 		if w.Code != http.StatusCreated {
 			t.Errorf("Expected 201 Created, got %d: %s", w.Code, w.Body.String())
 		}
+		assertSecurityHeaders(t, w)
 	})
 
 	t.Run("Create User - Authorized", func(t *testing.T) {
@@ -158,6 +184,7 @@ func TestAdminAPI(t *testing.T) {
 		if w.Code != http.StatusCreated {
 			t.Errorf("Expected 201 Created, got %d: %s", w.Code, w.Body.String())
 		}
+		assertSecurityHeaders(t, w)
 	})
 
 	t.Run("List Sites - Unauthorized (Regular User)", func(t *testing.T) {
@@ -171,6 +198,7 @@ func TestAdminAPI(t *testing.T) {
 		if w.Code != http.StatusForbidden {
 			t.Errorf("Expected 403 Forbidden for regular user, got %d", w.Code)
 		}
+		assertSecurityHeaders(t, w)
 	})
 
 	t.Run("List Users - Filtered by Site", func(t *testing.T) {
@@ -184,6 +212,7 @@ func TestAdminAPI(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Errorf("Expected 200 OK, got %d", w.Code)
 		}
+		assertSecurityHeaders(t, w)
 
 		var users []database.User
 		json.Unmarshal(w.Body.Bytes(), &users)

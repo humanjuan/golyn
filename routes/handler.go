@@ -9,7 +9,6 @@ import (
 	"mime"
 	"net/http"
 	"path/filepath"
-	"strings"
 )
 
 func CreateRouteHandler(basePath, fileType string) gin.HandlerFunc {
@@ -18,24 +17,20 @@ func CreateRouteHandler(basePath, fileType string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestedFile := c.Param("filepath")
 		fullPath := filepath.Join(basePath, fileType, requestedFile)
-		originalPath := strings.TrimSuffix(fullPath, ".br")
-		originalPath = strings.TrimSuffix(originalPath, ".gz")
 
 		contentType, ok := utils.GetAllowedMime(fullPath)
 		if !ok {
 			log.Warn("CreateRouteHandler() | Extension not allowed | Path: %s", fullPath)
-			if err := handlers.RenderError(c.Writer, http.StatusForbidden, utils.GetCodeMessage(http.StatusForbidden)); err != nil {
+			if err := handlers.RenderError(c, http.StatusForbidden, utils.GetCodeMessage(http.StatusForbidden)); err != nil {
 				c.AbortWithStatus(http.StatusForbidden)
 			}
 			c.Abort()
 			return
 		}
 
-		//contentType := utils.GetMimeTypeFromCompressedFilePath(fullPath)
-
 		if !utils.FileOrDirectoryExists(fullPath) {
 			log.Warn("CreateRouteHandler() | File not found | Path: %s", fullPath)
-			if err := handlers.RenderError(c.Writer, http.StatusNotFound, utils.GetCodeMessage(http.StatusNotFound)); err != nil {
+			if err := handlers.RenderError(c, http.StatusNotFound, utils.GetCodeMessage(http.StatusNotFound)); err != nil {
 				c.AbortWithStatus(http.StatusNotFound)
 			}
 			c.Abort()
@@ -53,6 +48,11 @@ func CreateStaticFileHandler(filePath string) gin.HandlerFunc {
 	log := globals.GetAppLogger()
 	log.Debug("CreateStaticFileHandler() | Serving file: %s", filePath)
 	return func(c *gin.Context) {
+		if c.IsAborted() {
+			log.Debug("CreateStaticFileHandler() | Request already aborted, skipping for: %s", filePath)
+			return
+		}
+
 		ext := filepath.Ext(filePath)
 		contentType := mime.TypeByExtension(ext)
 		if !utils.FileOrDirectoryExists(filePath) {
@@ -62,6 +62,7 @@ func CreateStaticFileHandler(filePath string) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+
 		c.Header("Content-Type", contentType)
 		c.File(filePath)
 	}

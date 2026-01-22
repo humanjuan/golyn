@@ -17,6 +17,7 @@ import (
 	"github.com/humanjuan/golyn/globals"
 	"github.com/humanjuan/golyn/internal"
 	"github.com/humanjuan/golyn/internal/cli"
+	internalcfg "github.com/humanjuan/golyn/internal/config"
 	"github.com/humanjuan/golyn/internal/handlers"
 	"github.com/humanjuan/golyn/internal/utils"
 	"github.com/humanjuan/golyn/lifecycle"
@@ -33,12 +34,12 @@ import (
 // Documentation: https://gin-gonic.com/docs/quickstart/
 
 const (
-	version    string = "v1.4.0"
+	version    string = "v1.5.0"
 	mainDomain string = "humanjuan.com"
 )
 
 func main() {
-	// Run CLI command if any flags are present
+	// CLI flags
 	exitCode, err, useFlag, noExtensions := cli.RunCLI()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
@@ -50,7 +51,6 @@ func main() {
 
 	lifecycle.NoExtensions = noExtensions
 
-	// Load configuration
 	conf, err := loaders.LoadConfig()
 	if err != nil {
 		panic(fmt.Sprintf("[ERROR] Failed to load server configuration: %v", err))
@@ -58,7 +58,6 @@ func main() {
 	globals.SetConfig(conf)
 	lifecycle.Init()
 
-	// Setup loggers
 	logApp, err := loaders.InitLog(strings.ToLower(conf.Server.Name), conf.Log.Path, conf.Log.Level, conf.Log.MaxSizeMb, conf.Log.MaxBackup, conf.Log.DailyRotation)
 	if err != nil {
 		panic(fmt.Sprintf("main() | Server logger init failed: %v", err.Error()))
@@ -70,7 +69,6 @@ func main() {
 	defer logApp.Close()
 	defer logDB.Close()
 
-	// Set global loggers
 	globals.SetAppLogger(logApp)
 	globals.SetDBLogger(logDB)
 
@@ -78,7 +76,6 @@ func main() {
 	fmt.Printf("Welcome back! - %v Server %v - PID %v\n", conf.Server.Name, version, pid)
 	logApp.Info("Welcome back! - %v Server %v - PID %v", conf.Server.Name, version, pid)
 
-	// Database connection
 	dbInstance := database.NewDBInstance()
 
 	if err = dbInstance.InitDB(&conf.Database, logDB); err != nil {
@@ -89,7 +86,6 @@ func main() {
 
 	globals.SetDBInstance(dbInstance)
 
-	// SSL Certificates
 	globals.InitCertificates()
 	if err = internal.LoadAllCertificates(conf.Sites); err != nil {
 		logApp.Error("main() | Certificate loading error: %v", err.Error())
@@ -98,7 +94,6 @@ func main() {
 
 	logApp.Debug("main() | globals.InvalidCertificates: %v", globals.InvalidCertificates)
 
-	// IP Discovery
 	publicIP, localIP, err := utils.GetIPAddresses()
 	if err != nil {
 		logApp.Error("main() | Failed to fetch public IP: %v", err.Error())
@@ -184,9 +179,11 @@ func main() {
 	serverRouter.Use(middlewares.LoggingMiddleware())
 	serverRouter.Use(middlewares.CustomErrorHandler())
 
-	serverRouter.Use(middlewares.SecureMiddleware(conf.Server.Dev))
+	// Platform security headers + HTTPS enforcement + per-site dynamic config reload (hash-based)
+	siteProvider := internalcfg.NewSiteProvider()
+	serverRouter.Use(middlewares.SecurityHeadersMiddleware(siteProvider, conf.Server.Dev))
 	serverRouter.Use(middlewares.RedirectOrAllowHostMiddleware())
-	serverRouter.Use(middlewares.CorsMiddleware(conf.Sites))
+	serverRouter.Use(middlewares.CorsMiddleware())
 	serverRouter.Use(middlewares.ClientCacheMiddleware(conf.Server.Dev))
 
 	serverRouter.Use(middlewares.CompressionMiddleware())
@@ -218,7 +215,11 @@ func main() {
 		logApp.Sync()
 		panic(err.Error())
 	}
-	logApp.Info("main() | HTTP redirect server on port 80")
+	if serverHTTP != nil {
+		logApp.Info("main() | HTTP redirect server on port 80")
+	} else {
+		logApp.Info("main() | HTTP server is disabled (Production mode).")
+	}
 
 	mode := "Release"
 	if conf.Server.Dev {
@@ -245,23 +246,19 @@ func main() {
 	}
 
 	// Start HTTP
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if serverHTTP == nil {
-			logApp.Error("main() | HTTP server is nil")
-			logApp.Sync()
-			os.Exit(1)
-			return
-		}
-		logApp.Debug("main() | Starting HTTP on %s", serverHTTP.Addr)
-		err = serverHTTP.ListenAndServe()
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logApp.Error("main() | HTTP server failed: %v", err.Error())
-			logApp.Sync()
-			os.Exit(1)
-		}
-	}()
+	if serverHTTP != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			logApp.Debug("main() | Starting HTTP on %s", serverHTTP.Addr)
+			err = serverHTTP.ListenAndServe()
+			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+				logApp.Error("main() | HTTP server failed: %v", err.Error())
+				logApp.Sync()
+				os.Exit(1)
+			}
+		}()
+	}
 
 	// Graceful shutdown
 	wg.Add(1)

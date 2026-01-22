@@ -2,12 +2,13 @@ package middlewares
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/humanjuan/golyn/globals"
-	"github.com/humanjuan/golyn/internal/utils"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+
+	"github.com/gin-gonic/gin"
+	"github.com/humanjuan/golyn/globals"
+	"github.com/humanjuan/golyn/internal/utils"
 )
 
 func ReverseProxyMiddleware(target string) gin.HandlerFunc {
@@ -31,9 +32,15 @@ func ReverseProxyMiddleware(target string) gin.HandlerFunc {
 			req.Header.Set("X-Forwarded-Ssl", "on")
 			req.Header.Set("X-Forwarded-Host", req.Host)
 			req.Header.Set("X-Real-IP", c.ClientIP())
-			req.Header.Set("X-Forwarded-For", c.ClientIP())
+
+			if existing := req.Header.Get("X-Forwarded-For"); existing != "" {
+				req.Header.Set("X-Forwarded-For", existing+", "+c.ClientIP())
+			} else {
+				req.Header.Set("X-Forwarded-For", c.ClientIP())
+			}
 		}
 
+		log.Debug("ReverseProxyMiddleware() | Serving proxy for target: %s", target)
 		proxy.ServeHTTP(c.Writer, c.Request)
 		c.Abort()
 	}

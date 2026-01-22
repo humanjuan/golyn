@@ -1,10 +1,11 @@
 package middlewares
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 func ClientCacheMiddleware(isDev bool) gin.HandlerFunc {
@@ -27,10 +28,8 @@ func ClientCacheMiddleware(isDev bool) gin.HandlerFunc {
 			}
 		}
 
-		// Security
+		// Cache-Control Vary header
 		c.Writer.Header().Set("Vary", "Origin")
-		c.Writer.Header().Set("X-Content-Type-Options", "nosniff")
-		c.Writer.Header().Set("X-Frame-Options", "DENY")
 
 		c.Next()
 	}

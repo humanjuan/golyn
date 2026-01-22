@@ -68,12 +68,13 @@ func OAuth2Login(provider string) gin.HandlerFunc {
 
 		// Implement secure state management (CSRF)
 		state := utils.GenerateRandomString(32)
-		c.SetCookie("oauth_state", state, 300, "/api/v1/auth", "", !globals.GetConfig().Server.Dev, true)
+		c.SetSameSite(utils.StringToSameSite(globals.GetConfig().Server.CookieSameSite))
+		c.SetCookie("oauth_state", state, 300, "/api/v1/auth", "", globals.GetConfig().Server.CookieSecure, globals.GetConfig().Server.CookieHttpOnly)
 
 		// Support for dynamic redirection after login
 		next := c.Query("next")
 		if next != "" {
-			c.SetCookie("oauth_next", next, 300, "/api/v1/auth", "", !globals.GetConfig().Server.Dev, true)
+			c.SetCookie("oauth_next", next, 300, "/api/v1/auth", "", globals.GetConfig().Server.CookieSecure, globals.GetConfig().Server.CookieHttpOnly)
 		}
 
 		url := oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
@@ -101,7 +102,8 @@ func OAuth2Callback(provider string) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		c.SetCookie("oauth_state", "", -1, "/api/v1/auth", "", !config.Server.Dev, true)
+		c.SetSameSite(utils.StringToSameSite(config.Server.CookieSameSite))
+		c.SetCookie("oauth_state", "", -1, "/api/v1/auth", "", config.Server.CookieSecure, config.Server.CookieHttpOnly)
 
 		code := c.Query("code")
 		if code == "" {
@@ -205,13 +207,13 @@ func OAuth2Callback(provider string) gin.HandlerFunc {
 		expirationTimeSec := config.Server.TokenExpirationRefreshTime * 60
 		accessTokenExpSec := config.Server.TokenExpirationTime * 60
 
-		c.SetSameSite(http.SameSiteLaxMode)
-		c.SetCookie("refreshToken", refreshToken, expirationTimeSec, "/", "", !config.Server.Dev, true)
-		c.SetCookie("access_token", accessToken, accessTokenExpSec, "/", "", !config.Server.Dev, true)
+		c.SetSameSite(utils.StringToSameSite(config.Server.CookieSameSite))
+		c.SetCookie("refreshToken", refreshToken, expirationTimeSec, "/", "", config.Server.CookieSecure, config.Server.CookieHttpOnly)
+		c.SetCookie("access_token", accessToken, accessTokenExpSec, "/", "", config.Server.CookieSecure, config.Server.CookieHttpOnly)
 
 		next, err := c.Cookie("oauth_next")
 		if err == nil && next != "" {
-			c.SetCookie("oauth_next", "", -1, "/api/v1/auth", "", !config.Server.Dev, true)
+			c.SetCookie("oauth_next", "", -1, "/api/v1/auth", "", config.Server.CookieSecure, config.Server.CookieHttpOnly)
 			c.Redirect(http.StatusTemporaryRedirect, next)
 			return
 		}

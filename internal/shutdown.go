@@ -10,6 +10,19 @@ import (
 	"time"
 )
 
+func shutdownServer(ctx context.Context, server *http.Server, name string) {
+	if server == nil {
+		return
+	}
+	log := globals.GetAppLogger()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Error("Error shutting down %s server: %v", name, err)
+		log.Sync()
+	} else {
+		log.Info("%s server shut down successfully.", name)
+	}
+}
+
 func CatchSignalDual(serverTLS, serverHTTP *http.Server) {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -27,21 +40,9 @@ func CatchSignalDual(serverTLS, serverHTTP *http.Server) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Shutdown HTTP server
-	if err := serverHTTP.Shutdown(ctx); err != nil {
-		log.Error("Error shutting down HTTP server: %v", err)
-		log.Sync()
-	} else {
-		log.Info("HTTP server shut down successfully.")
-	}
-
-	// Shutdown HTTPS server
-	if err := serverTLS.Shutdown(ctx); err != nil {
-		log.Error("Error shutting down HTTPS server: %v", err)
-		log.Sync()
-	} else {
-		log.Info("HTTPS server shut down successfully.")
-	}
+	// Shutdown servers
+	shutdownServer(ctx, serverHTTP, "HTTP")
+	shutdownServer(ctx, serverTLS, "HTTPS")
 
 	select {
 	case <-ctx.Done():

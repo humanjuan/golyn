@@ -9,12 +9,12 @@ require (
 	github.com/humanjuan/golyn-ai v0.0.0
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/unrolled/secure v1.17.0
 	golang.org/x/crypto v0.36.0
 	golang.org/x/oauth2 v0.34.0
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/bytedance/sonic/loader v0.2.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect

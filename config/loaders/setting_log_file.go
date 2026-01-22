@@ -45,11 +45,7 @@ func InitLog(name string, path string, level string, maxSizeMb int, maxBackup in
 	Log, err := acacia.Start(
 		name+"_server.log",
 		path,
-		strings.ToUpper(level),
-		acacia.WithBufferSize(250_000), // Handle bursts without excessive memory usage
-		acacia.WithBufferCap(128<<10),  // 128 KB internal buffer
-		acacia.WithDrainBurst(512),     // Batching for standard server load
-		acacia.WithFlushInterval(50*time.Millisecond)) // Balanced latency and overhead
+		strings.ToUpper(level))
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize Log: %w", err)
 	}

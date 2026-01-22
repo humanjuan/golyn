@@ -40,12 +40,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/humanjuan/acacia/v2"
 	"github.com/humanjuan/golyn/app"
 	"github.com/humanjuan/golyn/config/loaders"
 	"github.com/humanjuan/golyn/database"
@@ -68,16 +68,21 @@ func TestAuthenticationFlow(t *testing.T) {
 	// Setup Environment
 	if os.Getenv("GOLYN_BASE_PATH") == "" {
 		cwd, _ := os.Getwd()
-		os.Setenv("GOLYN_BASE_PATH", cwd)
+		base := cwd
+		if filepath.Base(base) == "test" {
+			base = filepath.Dir(base)
+		}
+		os.Setenv("GOLYN_BASE_PATH", base)
 	}
 
-	log, _ := acacia.Start("test_jwt_flow.log", "./var/log", "DEBUG")
+	logDir := t.TempDir()
+	log, err := loaders.InitLog("test_jwt_flow", logDir, "debug", 5, 1, false)
+	if err != nil {
+		t.Fatalf("failed to init logger: %v", err)
+	}
 	globals.SetAppLogger(log)
 	globals.SetDBLogger(log)
-	defer func() {
-		log.Close()
-		os.Remove("./var/log/test_jwt_flow.log")
-	}()
+	t.Cleanup(func() { log.Close() })
 
 	// Load real configuration but override specific values for controlled testing
 	conf, err := loaders.LoadConfig()

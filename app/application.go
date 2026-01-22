@@ -26,6 +26,8 @@ type Cert struct {
 
 type VirtualHost struct {
 	HostName    string
+	SiteName    string
+	ConfigPath  string
 	BasePath    string
 	SiteGroup   *gin.RouterGroup
 	Proxy       bool

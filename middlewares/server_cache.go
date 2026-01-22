@@ -8,6 +8,7 @@ import (
 	"github.com/patrickmn/go-cache"
 	"net/http"
 	"path/filepath"
+	"strings"
 )
 
 func CacheMiddleware(servCache *cache.Cache) gin.HandlerFunc {
@@ -55,7 +56,7 @@ func FileExistsCached(c *gin.Context, site string, relativePath string, encoding
 	}
 
 	virtualHosts := globals.VirtualHosts
-	host := c.Request.Host
+	host := strings.Split(c.Request.Host, ":")[0]
 	virtualHost, ok := virtualHosts[host]
 	if !ok {
 		return false
@@ -63,15 +64,20 @@ func FileExistsCached(c *gin.Context, site string, relativePath string, encoding
 
 	fullPath := filepath.Join(virtualHost.BasePath, relativePath)
 
-	if encoding == "br" || encoding == "gzip" || encoding == "zstd" || encoding == "deflate" {
-		fullPath += "." + encoding
+	if encoding == "br" {
+		fullPath += ".br"
+	} else if encoding == "gzip" || encoding == "gz" {
+		fullPath += ".gz"
+	} else if encoding == "zstd" || encoding == "zst" {
+		fullPath += ".zst"
+	} else if encoding == "deflate" {
+		fullPath += ".deflate"
 	}
 
 	exists := utils.FileOrDirectoryExists(fullPath)
 	servCache.SetDefault(key, exists)
 
 	return exists
-
 }
 
 func buildCacheKey(site string, path string, encoding string) string {

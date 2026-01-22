@@ -42,6 +42,19 @@ func (dbi *DBInstance) UpdateSiteStatus(key, status string) error {
 	return err
 }
 
+func (dbi *DBInstance) GetUserByUsername(username string) (*User, error) {
+	var users []User
+	query := Queries["get_user_by_username"]
+	err := dbi.Select(query, &users, username)
+	if err != nil {
+		return nil, err
+	}
+	if len(users) == 0 {
+		return nil, nil
+	}
+	return &users[0], nil
+}
+
 func (dbi *DBInstance) GetAllUsers() ([]User, error) {
 	var users []User
 	query := Queries["get_all_users"]

@@ -40,7 +40,7 @@ func CustomErrorHandler() gin.HandlerFunc {
 				})
 			} else {
 				c.Writer.Header().Set("X-Request-Path", c.Request.URL.Path)
-				if err := handlers.RenderError(c.Writer, status, message); err != nil {
+				if err := handlers.RenderError(c, status, message); err != nil {
 					c.AbortWithStatus(status)
 				}
 			}
