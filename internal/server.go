@@ -85,7 +85,15 @@ func SetupServerHTTPS(router http.Handler) (*http.Server, error) {
 
 func SetupServerHTTP(router http.Handler) (*http.Server, error) {
 	log := globals.GetAppLogger()
-	log.Debug("SetupServerHTTP()")
+	config := globals.GetConfig()
+
+	// Platform policy: Do not serve HTTP in production.
+	if !config.Server.Dev {
+		log.Info("SetupServerHTTP() | Platform policy: HTTP server is disabled in production.")
+		return nil, nil
+	}
+
+	log.Debug("SetupServerHTTP() | Starting HTTP server (Development mode).")
 
 	// HTTP server for port 80
 	serverHTTP := &http.Server{

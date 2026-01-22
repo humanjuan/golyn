@@ -3,6 +3,7 @@ package loaders
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -29,8 +30,8 @@ type TLS_SSL struct {
 
 type Security struct {
 	AllowOrigin           []string
-	HTTPSRedirect         bool
 	ContentSecurityPolicy string
+	PermissionsPolicy     string
 	TLS_SSL               TLS_SSL
 }
 type SiteConfig struct {
@@ -46,12 +47,14 @@ type SiteConfig struct {
 }
 
 type Database struct {
-	Username string
-	Password string
-	Database string
-	Schema   string
-	Host     string
-	Port     int
+	Username    string
+	Password    string
+	Database    string
+	Schema      string
+	Host        string
+	Port        int
+	SSL         bool
+	SSLRootCert string
 }
 
 type Server struct {
@@ -67,6 +70,15 @@ type Server struct {
 	TokenExpirationTime        int
 	TokenExpirationRefreshTime int
 	JWTSecret                  string
+	ContentSecurityPolicy      string
+	PermissionsPolicy          string
+	RateLimitRequests          int
+	CookieSameSite             string
+	CookieHttpOnly             bool
+	CookieSecure               bool
+	GlobalWhitelist            []string
+	ParsedWhitelistNetworks    []*net.IPNet
+	ExcludedPaths              []string
 }
 
 type Cache struct {
@@ -129,14 +141,14 @@ func LoadConfig() (*Config, error) {
 
 	basePath, err := utils.GetBasePath()
 	if err != nil {
-		return &Config{}, errors.New(fmt.Sprintf("Error finding base path: %v", err))
+		return &Config{}, fmt.Errorf("error finding base path: %v", err)
 	}
 
 	configFilePath := filepath.Join(basePath, "config", "server", "web_server.conf")
 
 	cfg, err := ini.Load(configFilePath)
 	if err != nil {
-		return &Config{}, errors.New(fmt.Sprintf("Error loading configuration file %s: %v", configFilePath, err))
+		return &Config{}, fmt.Errorf("error loading configuration file %s: %v", configFilePath, err)
 	}
 
 	// Database Configuration
@@ -147,6 +159,11 @@ func LoadConfig() (*Config, error) {
 	database.Schema = dbSection.Key("schema").String()
 	database.Username = dbSection.Key("username").String()
 	database.Password = expandEnv(dbSection.Key("password").String())
+	database.SSL, _ = dbSection.Key("ssl").Bool()
+	database.SSLRootCert, _, _ = CheckString(dbSection.Key("sslRootCert"), false, "database", "sslRootCert")
+	if database.SSLRootCert != "" && !filepath.IsAbs(database.SSLRootCert) {
+		database.SSLRootCert = filepath.Join(basePath, database.SSLRootCert)
+	}
 
 	// Server Configuration
 	serverSection := cfg.Section("server")
@@ -165,6 +182,23 @@ func LoadConfig() (*Config, error) {
 	// JWT Secret with environment variable support
 	server.JWTSecret = expandEnv(serverSection.Key("jwtSecret").String())
 
+	server.ContentSecurityPolicy = strings.Trim(serverSection.Key("contentSecurityPolicy").String(), "\"")
+	server.PermissionsPolicy = strings.Trim(serverSection.Key("permissionsPolicy").String(), "\"")
+	server.RateLimitRequests, _ = serverSection.Key("rateLimitRequests").Int()
+
+	// New security parameters
+	server.CookieSameSite = serverSection.Key("cookieSameSite").MustString("Lax")
+	server.CookieHttpOnly = serverSection.Key("cookieHttpOnly").MustBool(true)
+	server.CookieSecure = serverSection.Key("cookieSecure").MustBool(true)
+	server.GlobalWhitelist = serverSection.Key("globalWhitelist").Strings(",")
+	for _, entry := range server.GlobalWhitelist {
+		entry = strings.TrimSpace(entry)
+		if _, ipnet, err := net.ParseCIDR(entry); err == nil {
+			server.ParsedWhitelistNetworks = append(server.ParsedWhitelistNetworks, ipnet)
+		}
+	}
+	server.ExcludedPaths = serverSection.Key("excludedPaths").Strings(",")
+
 	if !filepath.IsAbs(server.SitesRootPath) {
 		server.SitesRootPath = filepath.Join(basePath, server.SitesRootPath)
 	}
@@ -172,7 +206,7 @@ func LoadConfig() (*Config, error) {
 	dirExists := utils.FileOrDirectoryExists(server.SitesRootPath)
 
 	if !dirExists {
-		return &Config{}, errors.New(fmt.Sprintf("A sites root path is missing."))
+		return &Config{}, fmt.Errorf("a sites root path is missing")
 	}
 
 	// Sites Configuration
@@ -189,7 +223,7 @@ func LoadConfig() (*Config, error) {
 		go func(name, path string) {
 			defer wg.Done()
 			defer func() { <-sem }() // token free
-			site, err := loadSiteConfig(name, path, basePath, server)
+			site, err := LoadSiteConfig(name, path, basePath, server)
 			if err != nil {
 				return
 			}
@@ -236,10 +270,10 @@ func LoadConfig() (*Config, error) {
 
 			provider := OAuthProvider{}
 			provider.Enabled, _ = section.Key("enabled").Bool()
-			provider.ClientID = expandEnv(section.Key("client_id").String())
-			provider.ClientSecret = expandEnv(section.Key("client_secret").String())
-			provider.RedirectURL = expandEnv(section.Key("redirect_url").String())
-			provider.TenantID = expandEnv(section.Key("tenant_id").String())
+			provider.ClientID = expandEnv(section.Key("clientId").String())
+			provider.ClientSecret = expandEnv(section.Key("clientSecret").String())
+			provider.RedirectURL = expandEnv(section.Key("redirectUrl").String())
+			provider.TenantID = expandEnv(section.Key("tenantId").String())
 
 			oauth2.Providers[providerName] = provider
 		}
@@ -280,7 +314,7 @@ func expandEnv(val string) string {
 	return os.ExpandEnv(val)
 }
 
-func loadSiteConfig(name string, path string, basePath string, server Server) (SiteConfig, error) {
+func LoadSiteConfig(name string, path string, basePath string, server Server) (SiteConfig, error) {
 	var siteConfig SiteConfig
 	var staticFiles StaticFiles
 	var tls_ssl TLS_SSL
@@ -337,7 +371,7 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 	}
 
 	if siteConfig.Proxy {
-		siteConfig.ProxyTarget, ok, err = CheckString(siteSettings.Key("proxy_target"), true, sectionName, "proxy_target")
+		siteConfig.ProxyTarget, ok, err = CheckString(siteSettings.Key("proxyTarget"), true, sectionName, "proxyTarget")
 		if !ok {
 			siteConfig.Enabled = false
 			fmt.Printf("[ERROR] The site %s was deactivated due to incorrect configuration with proxy. Proxy target is empty\n", name)
@@ -346,7 +380,7 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 		fmt.Printf("[INFO] Skipping static files for site '%s' because it is a proxy\n", name)
 	} else {
 		// STATIC FILES
-		staticFiles.Assets, ok, err = CheckString(siteSettings.Key("static_files_path"), true, sectionName, "static_files_path")
+		staticFiles.Assets, ok, err = CheckString(siteSettings.Key("staticFilesPath"), true, sectionName, "staticFilesPath")
 		if !ok {
 			siteConfig.Enabled = false
 			fmt.Printf("[ERROR] The site %s was deactivated due to incorrect configuration with static files. Static files path is empty\n", name)
@@ -360,7 +394,7 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 			return siteConfig, fmt.Errorf("the static file directory '%s' does not exist", staticFiles.Assets)
 		}
 
-		staticFiles.Js, ok, err = CheckString(siteSettings.Key("js_path"), true, sectionName, "js_path")
+		staticFiles.Js, ok, err = CheckString(siteSettings.Key("jsPath"), true, sectionName, "jsPath")
 		if !ok {
 			siteConfig.Enabled = false
 			fmt.Printf("[ERROR] The site %s was deactivated due to incorrect configuration with static files. JS path is empty\n", name)
@@ -374,7 +408,7 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 			return siteConfig, fmt.Errorf("the static file directory '%s' does not exist", staticFiles.Js)
 		}
 
-		staticFiles.Style, ok, err = CheckString(siteSettings.Key("style_path"), true, sectionName, "style_path")
+		staticFiles.Style, ok, err = CheckString(siteSettings.Key("stylePath"), true, sectionName, "stylePath")
 		if !ok {
 			siteConfig.Enabled = false
 			fmt.Printf("[ERROR] The site %s was deactivated due to incorrect configuration with static files. Style path is empty\n", name)
@@ -391,34 +425,34 @@ func loadSiteConfig(name string, path string, basePath string, server Server) (S
 	}
 
 	// SSL/TLS
-	tls_ssl.Cert, _, _ = CheckString(siteSettings.Key("cert_path"), false, sectionName, "cert_path")
+	tls_ssl.Cert, _, _ = CheckString(siteSettings.Key("certPath"), false, sectionName, "certPath")
 	if tls_ssl.Cert != "" && !filepath.IsAbs(tls_ssl.Cert) {
 		tls_ssl.Cert = filepath.Join(basePath, tls_ssl.Cert)
 	}
 
-	tls_ssl.Key, _, _ = CheckString(siteSettings.Key("key_path"), false, sectionName, "key_path")
+	tls_ssl.Key, _, _ = CheckString(siteSettings.Key("keyPath"), false, sectionName, "keyPath")
 	if tls_ssl.Key != "" && !filepath.IsAbs(tls_ssl.Key) {
 		tls_ssl.Key = filepath.Join(basePath, tls_ssl.Key)
 	}
 
-	tls_ssl.Chain, _, _ = CheckString(siteSettings.Key("chain_path"), false, sectionName, "chain_path")
+	tls_ssl.Chain, _, _ = CheckString(siteSettings.Key("chainPath"), false, sectionName, "chainPath")
 	if tls_ssl.Chain != "" && !filepath.IsAbs(tls_ssl.Chain) {
 		tls_ssl.Chain = filepath.Join(basePath, tls_ssl.Chain)
 	}
 	security.TLS_SSL = tls_ssl
 
 	// SECURITY
-	security.AllowOrigin = siteSettings.Key("allow_origin").Strings(",")
-	security.HTTPSRedirect, _ = siteSettings.Key("enable_https_redirect").Bool()
-	security.ContentSecurityPolicy = siteSettings.Key("content_security_policy").String()
+	security.AllowOrigin = siteSettings.Key("allowOrigin").Strings(",")
+	security.ContentSecurityPolicy = strings.Trim(siteSettings.Key("contentSecurityPolicy").String(), "\"")
+	security.PermissionsPolicy = strings.Trim(siteSettings.Key("permissionsPolicy").String(), "\"")
 	siteConfig.Security = security
 
 	// SMTP
-	smtp.Host, _, _ = CheckString(siteSettings.Key("smtp_host"), false, sectionName, "smtp_host")
-	smtp.Port, _, _ = CheckInt(siteSettings.Key("smtp_port"), false, sectionName, "smtp_port")
-	smtp.Username, _, _ = CheckString(siteSettings.Key("smtp_user"), false, sectionName, "smtp_user")
-	smtp.Password = os.ExpandEnv(siteSettings.Key("smtp_password").String())
-	smtp.RateLimitRequests, _, _ = CheckInt(siteSettings.Key("smtp_ratelimit_requests"), false, sectionName, "smtp_rate_limit_requests")
+	smtp.Host, _, _ = CheckString(siteSettings.Key("smtpHost"), false, sectionName, "smtpHost")
+	smtp.Port, _, _ = CheckInt(siteSettings.Key("smtpPort"), false, sectionName, "smtpPort")
+	smtp.Username, _, _ = CheckString(siteSettings.Key("smtpUser"), false, sectionName, "smtpUser")
+	smtp.Password = os.ExpandEnv(siteSettings.Key("smtpPassword").String())
+	smtp.RateLimitRequests, _, _ = CheckInt(siteSettings.Key("smtpRateLimitRequests"), false, sectionName, "smtpRateLimitRequests")
 
 	siteConfig.SMTP = smtp
 	return siteConfig, nil
