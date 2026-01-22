@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -22,7 +23,7 @@ func CSRFMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		host := c.Request.Host
+		host := strings.Split(c.Request.Host, ":")[0]
 		if _, exists := virtualhosts[host]; !exists {
 			log.Warn("CSRFMiddleware() | Access denied | Host: %s | URL: %s", host, c.Request.URL)
 			c.Error(utils.NewHTTPError(http.StatusForbidden, "Host not configured in VirtualHosts"))
@@ -57,7 +58,7 @@ func GenerateCSRFToken(c *gin.Context) {
 	log := globals.GetAppLogger()
 	log.Debug("GenerateCSRFToken()")
 	virtualhosts := globals.VirtualHosts
-	host := c.Request.Host
+	host := strings.Split(c.Request.Host, ":")[0]
 
 	if _, exists := virtualhosts[host]; !exists {
 		log.Warn("GenerateCSRFToken() | Access denied | Host: %s | URL: %s", host, c.Request.URL)
@@ -74,7 +75,8 @@ func GenerateCSRFToken(c *gin.Context) {
 		return
 	}
 	token := base64.StdEncoding.EncodeToString(tokenBytes)
-	c.SetCookie("csrf_token", token, int(time.Hour.Seconds()), "/", "", !globals.GetConfig().Server.Dev, false)
+	c.SetSameSite(utils.StringToSameSite(globals.GetConfig().Server.CookieSameSite))
+	c.SetCookie("csrf_token", token, int(time.Hour.Seconds()), "/", "", globals.GetConfig().Server.CookieSecure, globals.GetConfig().Server.CookieHttpOnly)
 	log.Debug("GenerateCSRFToken() | CSRF token generated for %s", host)
 	c.JSON(http.StatusOK, gin.H{
 		"csrf_token": token,

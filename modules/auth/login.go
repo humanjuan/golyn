@@ -54,7 +54,6 @@ func Login() gin.HandlerFunc {
 		}
 
 		if user == nil || len(user) == 0 {
-			// update cache attempts
 			if attempt, found := _cache.Get(c.ClientIP()); found {
 				attempts = attempt.(int)
 				attempts++
@@ -76,7 +75,6 @@ func Login() gin.HandlerFunc {
 		err = bcrypt.CompareHashAndPassword([]byte(user[0].PasswordHash), []byte(loginUser.Password))
 
 		if err != nil {
-			// update cache attempts
 			if attempt, found := _cache.Get(c.ClientIP()); found {
 				attempts = attempt.(int)
 				attempts++
@@ -131,9 +129,9 @@ func Login() gin.HandlerFunc {
 		expirationTimeSec := config.Server.TokenExpirationRefreshTime * 60
 		accessTokenExpSec := config.Server.TokenExpirationTime * 60
 
-		c.SetSameSite(http.SameSiteLaxMode)
-		c.SetCookie("refreshToken", refreshToken, expirationTimeSec, "/", "", !config.Server.Dev, true)
-		c.SetCookie("access_token", accessToken, accessTokenExpSec, "/", "", !config.Server.Dev, true)
+		c.SetSameSite(utils.StringToSameSite(config.Server.CookieSameSite))
+		c.SetCookie("refreshToken", refreshToken, expirationTimeSec, "/", "", config.Server.CookieSecure, config.Server.CookieHttpOnly)
+		c.SetCookie("access_token", accessToken, accessTokenExpSec, "/", "", config.Server.CookieSecure, config.Server.CookieHttpOnly)
 
 		response := BuildLoginResponse(
 			user[0],
@@ -188,9 +186,9 @@ func RefreshToken() gin.HandlerFunc {
 		expirationTimeSec := config.Server.TokenExpirationRefreshTime * 60
 		accessTokenExpSec := config.Server.TokenExpirationTime * 60
 
-		c.SetSameSite(http.SameSiteLaxMode)
-		c.SetCookie("refreshToken", newRefreshToken, expirationTimeSec, "/", "", !config.Server.Dev, true)
-		c.SetCookie("access_token", newAccessToken, accessTokenExpSec, "/", "", !config.Server.Dev, true)
+		c.SetSameSite(utils.StringToSameSite(config.Server.CookieSameSite))
+		c.SetCookie("refreshToken", newRefreshToken, expirationTimeSec, "/", "", config.Server.CookieSecure, config.Server.CookieHttpOnly)
+		c.SetCookie("access_token", newAccessToken, accessTokenExpSec, "/", "", config.Server.CookieSecure, config.Server.CookieHttpOnly)
 
 		c.Status(http.StatusNoContent)
 	}
@@ -217,12 +215,12 @@ func Logout() gin.HandlerFunc {
 			}
 		}
 
-		c.SetSameSite(http.SameSiteLaxMode)
-		c.SetCookie("refreshToken", "", -1, "/", "", !config.Server.Dev, true)
-		c.SetCookie("access_token", "", -1, "/", "", !config.Server.Dev, true)
+		c.SetSameSite(utils.StringToSameSite(config.Server.CookieSameSite))
+		c.SetCookie("refreshToken", "", -1, "/", "", config.Server.CookieSecure, config.Server.CookieHttpOnly)
+		c.SetCookie("access_token", "", -1, "/", "", config.Server.CookieSecure, config.Server.CookieHttpOnly)
 
-		c.SetCookie("oauth_state", "", -1, "/api/v1/auth", "", !config.Server.Dev, true)
-		c.SetCookie("oauth_next", "", -1, "/api/v1/auth", "", !config.Server.Dev, true)
+		c.SetCookie("oauth_state", "", -1, "/api/v1/auth", "", config.Server.CookieSecure, config.Server.CookieHttpOnly)
+		c.SetCookie("oauth_next", "", -1, "/api/v1/auth", "", config.Server.CookieSecure, config.Server.CookieHttpOnly)
 
 		log.Info("Logout() | User logged out and cookies cleared | ClientIP: %s", c.ClientIP())
 

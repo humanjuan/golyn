@@ -18,13 +18,20 @@ func (dbi *DBInstance) InitDB(config *loaders.Database, log *acacia.Log) error {
 	log.Info("DB user: %s | DB name: %s | DB schema: %s | DB host: %s | DB port: %d",
 		config.Username, config.Database, config.Schema, config.Host, config.Port)
 
-	dbString := fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s sslmode=disable search_path=%s",
-		config.Username, config.Password, config.Host, config.Port, config.Database, config.Schema) // SSL disabled for now
+	sslMode := "disable"
+	if config.SSL {
+		sslMode = "verify-ca"
+		if config.SSLRootCert != "" {
+			sslMode = fmt.Sprintf("verify-ca sslrootcert=%s", config.SSLRootCert)
+		}
+	}
 
-	log.Debug("Postgres connection string: user=%s password=************ host=%s port=%d dbname=%s sslmode=disable search_path=%s",
-		config.Username, config.Host, config.Port, config.Database, config.Schema)
+	dbString := fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s sslmode=%s search_path=%s",
+		config.Username, config.Password, config.Host, config.Port, config.Database, sslMode, config.Schema)
 
-	// Setup connection pool
+	log.Debug("Postgres connection string: user=%s password=************ host=%s port=%d dbname=%s sslmode=%s search_path=%s",
+		config.Username, config.Host, config.Port, config.Database, sslMode, config.Schema)
+
 	dbi.db, err = pgxpool.New(context.Background(), dbString)
 
 	if err != nil {
