@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/humanjuan/golyn/database"
 	"github.com/humanjuan/golyn/globals"
+	"github.com/humanjuan/golyn/internal/security/hierarchy"
 	"github.com/humanjuan/golyn/internal/utils"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -163,6 +164,16 @@ func CreateUser() gin.HandlerFunc {
 			req.Role = "user"
 		}
 
+		// Role Hierarchy Check
+		actorRoleVal, _ := c.Get("role")
+		actorRole := strings.ToLower(fmt.Sprintf("%v", actorRoleVal))
+		if !hierarchy.CanCreate(actorRole, req.Role) {
+			log.Warn("Admin.CreateUser() | Hierarchy Violation | Actor: %s (%s) tried to create: %s", c.GetString("subject"), actorRole, req.Role)
+			c.Error(utils.NewHTTPError(http.StatusForbidden, "hierarchy violation: cannot create user with higher or equal role"))
+			c.Abort()
+			return
+		}
+
 		hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
 		err = db.CreateUser(site.Id, req.Username, string(hashedPassword), req.Role)
 		if err != nil {
@@ -228,7 +239,25 @@ func DeleteUser() gin.HandlerFunc {
 		}
 
 		db := globals.GetDBInstance()
-		err := db.DeleteUser(username)
+
+		// Role Hierarchy Check
+		targetUser, err := db.GetUserByUsername(username)
+		if err != nil || targetUser == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "user not found"))
+			c.Abort()
+			return
+		}
+
+		actorRoleVal, _ := c.Get("role")
+		actorRole := strings.ToLower(fmt.Sprintf("%v", actorRoleVal))
+		if !hierarchy.CanManage(actorRole, targetUser.Role) {
+			log.Warn("Admin.DeleteUser() | Hierarchy Violation | Actor: %s (%s) tried to delete: %s (%s)", c.GetString("subject"), actorRole, username, targetUser.Role)
+			c.Error(utils.NewHTTPError(http.StatusForbidden, "hierarchy violation: cannot delete user with higher or equal role"))
+			c.Abort()
+			return
+		}
+
+		err = db.DeleteUser(username)
 		if err != nil {
 			log.Error("Admin.DeleteUser() | Failed to delete user: %v", err)
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to delete user"))
@@ -271,7 +300,25 @@ func UpdateUserStatus() gin.HandlerFunc {
 		}
 
 		db := globals.GetDBInstance()
-		err := db.UpdateUserStatus(username, req.Status)
+
+		// Role Hierarchy Check
+		targetUser, err := db.GetUserByUsername(username)
+		if err != nil || targetUser == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "user not found"))
+			c.Abort()
+			return
+		}
+
+		actorRoleVal, _ := c.Get("role")
+		actorRole := strings.ToLower(fmt.Sprintf("%v", actorRoleVal))
+		if !hierarchy.CanManage(actorRole, targetUser.Role) {
+			log.Warn("Admin.UpdateUserStatus() | Hierarchy Violation | Actor: %s (%s) tried to update status: %s (%s)", c.GetString("subject"), actorRole, username, targetUser.Role)
+			c.Error(utils.NewHTTPError(http.StatusForbidden, "hierarchy violation: cannot update status for user with higher or equal role"))
+			c.Abort()
+			return
+		}
+
+		err = db.UpdateUserStatus(username, req.Status)
 		if err != nil {
 			log.Error("Admin.UpdateUserStatus() | Failed to update user status: %v", err)
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to update user status"))
@@ -289,15 +336,8 @@ func UpdateUserStatus() gin.HandlerFunc {
 func UpdateUserRole() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := globals.GetAppLogger()
-		// Only SuperAdmin can change roles
-		roleVal, _ := c.Get("role")
-		role := strings.ToLower(fmt.Sprintf("%v", roleVal))
-		if role != "superadmin" {
-			log.Warn("Admin.UpdateUserRole() | Access denied | User: %s | Role: %v", c.GetString("subject"), role)
-			c.Error(utils.NewHTTPError(http.StatusForbidden, "insufficient privileges"))
-			c.Abort()
-			return
-		}
+		actorRoleVal, _ := c.Get("role")
+		actorRole := strings.ToLower(fmt.Sprintf("%v", actorRoleVal))
 
 		username := strings.ToLower(c.Param("username"))
 		if username == "" {
@@ -316,7 +356,31 @@ func UpdateUserRole() gin.HandlerFunc {
 		}
 
 		db := globals.GetDBInstance()
-		err := db.UpdateUserRole(username, req.Role)
+
+		// Role Hierarchy Check
+		targetUser, err := db.GetUserByUsername(username)
+		if err != nil || targetUser == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "user not found"))
+			c.Abort()
+			return
+		}
+
+		if !hierarchy.CanManage(actorRole, targetUser.Role) {
+			log.Warn("Admin.UpdateUserRole() | Hierarchy Violation | Actor: %s (%s) tried to update role: %s (%s)", c.GetString("subject"), actorRole, username, targetUser.Role)
+			c.Error(utils.NewHTTPError(http.StatusForbidden, "hierarchy violation: cannot update role for user with higher or equal role"))
+			c.Abort()
+			return
+		}
+
+		// Check if the NEW role is allowed to be assigned by actor
+		if !hierarchy.CanCreate(actorRole, req.Role) {
+			log.Warn("Admin.UpdateUserRole() | Hierarchy Violation | Actor: %s (%s) tried to assign role: %s", c.GetString("subject"), actorRole, req.Role)
+			c.Error(utils.NewHTTPError(http.StatusForbidden, "hierarchy violation: cannot assign a role higher or equal to yours"))
+			c.Abort()
+			return
+		}
+
+		err = db.UpdateUserRole(username, req.Role)
 		if err != nil {
 			log.Error("Admin.UpdateUserRole() | Failed to update user role: %v", err)
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to update user role"))

@@ -2,10 +2,13 @@ package admin
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/humanjuan/golyn/globals"
+	"github.com/humanjuan/golyn/internal/security/hierarchy"
 	"github.com/humanjuan/golyn/internal/utils"
 )
 
@@ -29,6 +32,24 @@ func GetUserPermissions() gin.HandlerFunc {
 		}
 
 		db := globals.GetDBInstance()
+
+		// Role Hierarchy Check
+		targetUser, err := db.GetUserByUsername(username)
+		if err != nil || targetUser == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "user not found"))
+			c.Abort()
+			return
+		}
+
+		actorRoleVal, _ := c.Get("role")
+		actorRole := strings.ToLower(fmt.Sprintf("%v", actorRoleVal))
+		if !hierarchy.CanManage(actorRole, targetUser.Role) {
+			log.Warn("Admin.GetUserPermissions() | Hierarchy Violation | Actor: %s (%s) tried to view permissions: %s (%s)", c.GetString("subject"), actorRole, username, targetUser.Role)
+			c.Error(utils.NewHTTPError(http.StatusForbidden, "hierarchy violation: cannot view permissions for user with higher or equal role"))
+			c.Abort()
+			return
+		}
+
 		permissionsRaw, err := db.GetUserPermissions(username)
 		if err != nil {
 			log.Error("Admin.GetUserPermissions() | Failed to fetch permissions: %v", err)
@@ -81,6 +102,24 @@ func UpdateUserPermissions() gin.HandlerFunc {
 		}
 
 		db := globals.GetDBInstance()
+
+		// Role Hierarchy Check
+		targetUser, err := db.GetUserByUsername(username)
+		if err != nil || targetUser == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "user not found"))
+			c.Abort()
+			return
+		}
+
+		actorRoleVal, _ := c.Get("role")
+		actorRole := strings.ToLower(fmt.Sprintf("%v", actorRoleVal))
+		if !hierarchy.CanManage(actorRole, targetUser.Role) {
+			log.Warn("Admin.UpdateUserPermissions() | Hierarchy Violation | Actor: %s (%s) tried to update permissions: %s (%s)", c.GetString("subject"), actorRole, username, targetUser.Role)
+			c.Error(utils.NewHTTPError(http.StatusForbidden, "hierarchy violation: cannot update permissions for user with higher or equal role"))
+			c.Abort()
+			return
+		}
+
 		err = db.UpdateUserPermissions(username, permissionsJSON)
 		if err != nil {
 			log.Error("Admin.UpdateUserPermissions() | Failed to update permissions: %v", err)
