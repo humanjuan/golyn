@@ -61,7 +61,7 @@ builds/*.gz
 /sites/ashcards/
 /sites/iOG26/
 /golyn
-/sites/golyn/
+/sites/golyn/*
 /certificates/*
 /config/sites/futzy.conf
 /config/sites/ashcards.conf
@@ -75,3 +75,4 @@ builds/*.gz
 /config/sites/valheim.conf
 /test/var/
 /sites/hr/
+/test/cert/

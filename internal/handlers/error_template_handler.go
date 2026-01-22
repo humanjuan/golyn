@@ -2,10 +2,10 @@ package handlers
 
 import (
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/humanjuan/golyn/globals"
 	"github.com/humanjuan/golyn/internal/utils"
 	"html/template"
-	"net/http"
 	"path/filepath"
 )
 
@@ -38,15 +38,20 @@ func LoadErrorTemplate(templateDir string) error {
 	return nil
 }
 
-func RenderError(w http.ResponseWriter, status int, message string) error {
+func RenderError(c *gin.Context, status int, message string) error {
 	log := globals.GetAppLogger()
 	log.Debug("RenderError()")
-	w.Header().Set("Content-Type", "text/html")
-	return globals.ErrorTemplate.Execute(w, struct {
+	c.Writer.Header().Set("Content-Type", "text/html")
+
+	nonce, _ := c.Get("nonce")
+
+	return globals.ErrorTemplate.Execute(c.Writer, struct {
 		Status  int
 		Message string
+		Nonce   interface{}
 	}{
 		Status:  status,
 		Message: message,
+		Nonce:   nonce,
 	})
 }

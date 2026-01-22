@@ -1,33 +1,31 @@
 /*
 Package test provides integration and regression tests for the Golyn project.
 
-oauth2_multi_test.go: Multi-provider OAuth2 Integration Test
+oauth2_multi_test.go: Multi-Provider OAuth2 Integration Test
 
-This test validates the generic OAuth2 flow implemented in Golyn, ensuring it can
-handle different identity providers (Azure, Google, GitHub) and correctly map
-external identities to platform users.
+This test validates the OAuth2 authentication flow across multiple identity
+providers (Azure AD, Google, GitHub). It ensures that the redirection,
+state management, and provider-specific configurations work correctly.
 
 1. Setup:
-  - Initializes a mock server (httptest).
-  - Configures mock OAuth2 settings for Azure, Google, and GitHub.
-  - Creates a test user in the database.
+  - Initializes the application logger and global configuration.
+  - Mocks OAuth2 provider settings (Enabled, ClientID, Secrets, URLs).
+  - Connects to the database and creates a test user for identity linking.
+  - Configures a mock Gin router with OAuth2 routes.
 
 2. Test Objectives:
-  - Login Redirection: Verify that /auth/{provider}/login redirects to the correct provider URL.
-  - Callback Handling: Mock the provider's response and verify that Golyn:
-  - Exchanges the code for a token.
-  - Fetches user info from the provider's API.
-  - Maps the identity to a local user (by ID or Email).
-  - Issues a valid Platform JWT.
+  - Redirection: Verify that each provider's login endpoint redirects to the correct OAuth2 URL.
+  - State Security: Confirm that 'oauth_state' and 'oauth_next' cookies are set during the flow.
+  - Provider Availability: Ensure that disabled providers return a 403 Forbidden status.
+  - Audit Trail: Validate that authentication events (auth_events) are correctly logged in the database.
 
 3. Expected Results:
-  - Redirection points to the provider's authorization endpoint.
-  - Successful callback returns a 200 OK with a Platform JWT.
-  - User identity is correctly linked in the auth.external_identities table.
+  - Redirect URLs contain the correct 'state' parameter for CSRF protection.
+  - Responses for disabled providers include a clear error message.
+  - Database audit records are created with the correct metadata (IP, Agent, Event).
 
 4. Execution:
-  - Command: export $(grep -v '^#' .env | xargs) && go test -v test/oauth2_multi_test.go
-  - Requirements: A running PostgreSQL instance and a valid .env file.
+  - Command: go test -v test/oauth2_multi_test.go
 */
 package test
 
@@ -36,11 +34,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/humanjuan/acacia/v2"
 	"github.com/humanjuan/golyn/app"
 	"github.com/humanjuan/golyn/config/loaders"
 	"github.com/humanjuan/golyn/database"
@@ -54,16 +52,20 @@ func TestOAuth2MultiProvider(t *testing.T) {
 	// Setup Environment
 	if os.Getenv("GOLYN_BASE_PATH") == "" {
 		cwd, _ := os.Getwd()
-		os.Setenv("GOLYN_BASE_PATH", cwd)
+		base := cwd
+		if filepath.Base(base) == "test" {
+			base = filepath.Dir(base)
+		}
+		os.Setenv("GOLYN_BASE_PATH", base)
 	}
 
-	log, _ := acacia.Start("test_oauth2_multi.log", "./var/log", "DEBUG")
+	logDir := t.TempDir()
+	log, err := loaders.InitLog("test_oauth2_multi", logDir, "debug", 5, 1, false)
+	if err != nil {
+		t.Fatalf("failed to init logger: %v", err)
+	}
 	globals.SetAppLogger(log)
-	globals.SetDBLogger(log)
-	defer func() {
-		log.Close()
-		os.Remove("./var/log/test_oauth2_multi.log")
-	}()
+	t.Cleanup(func() { log.Close() })
 
 	conf, err := loaders.LoadConfig()
 	if err != nil {
@@ -115,7 +117,7 @@ func TestOAuth2MultiProvider(t *testing.T) {
 
 	// Cleanup
 	defer func() {
-		db.GetPool().Exec(context.Background(), "DELETE FROM auth.users WHERE username = $1", testUser)
+		_, _ = db.GetPool().Exec(context.Background(), "DELETE FROM auth.users WHERE username = $1", testUser)
 	}()
 
 	// Setup Site and User
@@ -125,9 +127,13 @@ func TestOAuth2MultiProvider(t *testing.T) {
 		t.Fatalf("Failed to retrieve any site id: %v", err)
 	}
 
-	db.GetPool().Exec(context.Background(), "DELETE FROM auth.users WHERE username = $1", testUser)
+	_, _ = db.GetPool().Exec(context.Background(), "DELETE FROM auth.users WHERE username = $1", testUser)
 	hashedPass, _ := bcrypt.GenerateFromPassword([]byte("OauthPass123!"), 10)
-	_, err = db.GetPool().Exec(context.Background(), "INSERT INTO auth.users (site_id, username, password_hash) VALUES ($1, $2, $3)", siteID, testUser, string(hashedPass))
+	_, err = db.GetPool().Exec(
+		context.Background(),
+		"INSERT INTO auth.users (site_id, username, password_hash) VALUES ($1, $2, $3)",
+		siteID, testUser, string(hashedPass),
+	)
 	if err != nil {
 		t.Fatalf("Failed to setup test user: %v", err)
 	}
@@ -166,7 +172,6 @@ func TestOAuth2MultiProvider(t *testing.T) {
 			if !strings.Contains(location, "state=") {
 				t.Errorf("%s login redirection missing state parameter", p)
 			}
-			t.Logf("[OK] %s redirect with state and cookies", p)
 		}
 	})
 
@@ -191,7 +196,6 @@ func TestOAuth2MultiProvider(t *testing.T) {
 		if !strings.Contains(w.Body.String(), "github OAuth2 is disabled") {
 			t.Errorf("Unexpected error message: %s", w.Body.String())
 		}
-		t.Log("[OK] Disabled provider correctly rejected")
 	})
 
 	t.Run("Callback Logic and Auth Events", func(t *testing.T) {
@@ -213,6 +217,5 @@ func TestOAuth2MultiProvider(t *testing.T) {
 		if count == 0 {
 			t.Error("Auth event was not found in database")
 		}
-		t.Log("[OK] Auth event registered successfully in Phase 3 logic")
 	})
 }

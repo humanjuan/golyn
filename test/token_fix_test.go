@@ -35,10 +35,10 @@ package test
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/humanjuan/acacia/v2"
 	"github.com/humanjuan/golyn/config/loaders"
 	"github.com/humanjuan/golyn/database"
 	"github.com/humanjuan/golyn/globals"
@@ -49,18 +49,23 @@ import (
 func TestTokenRevocationFix(t *testing.T) {
 	if os.Getenv("GOLYN_BASE_PATH") == "" {
 		cwd, _ := os.Getwd()
-		os.Setenv("GOLYN_BASE_PATH", cwd)
+		base := cwd
+		if filepath.Base(base) == "test" {
+			base = filepath.Dir(base)
+		}
+		os.Setenv("GOLYN_BASE_PATH", base)
 	}
 
 	var err error
 
-	log, _ := acacia.Start("test.log", "./var/log", "DEBUG")
+	logDir := t.TempDir()
+	log, err := loaders.InitLog("test_token_fix", logDir, "debug", 5, 1, false)
+	if err != nil {
+		t.Fatalf("failed to init logger: %v", err)
+	}
 	globals.SetAppLogger(log)
 	globals.SetDBLogger(log)
-	defer func() {
-		log.Close()
-		_ = os.Remove("./var/log/test.log")
-	}()
+	t.Cleanup(func() { log.Close() })
 
 	db := database.NewDBInstance()
 	env := os.Getenv("GOLYN_DB_PASSWORD")
