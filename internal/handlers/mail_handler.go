@@ -4,11 +4,13 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/humanjuan/golyn/config/loaders"
 	"github.com/humanjuan/golyn/globals"
 	"github.com/humanjuan/golyn/internal/security"
 	"github.com/humanjuan/golyn/internal/utils"
 	"net/http"
-	"net/smtp"
+	gosmtp "net/smtp"
+	"strings"
 	"time"
 )
 
@@ -20,15 +22,28 @@ type SendMailRequest struct {
 
 func SendmailHandler() gin.HandlerFunc {
 	log := globals.GetAppLogger()
-	virtualhosts := globals.VirtualHosts
 	var err error
 	log.Debug("SendmailHandler()")
 	return func(c *gin.Context) {
-		host := c.Request.Host
-		site, exists := virtualhosts[host]
-		if !exists {
-			log.Warn("SendmailHandler() | Access denied | Host: %s | URL: %s", host, c.Request.URL)
-			err = fmt.Errorf("access denied for host %s", host)
+		host := strings.Split(c.Request.Host, ":")[0]
+
+		var smtp loaders.SMTP
+		if cfg, exists := c.Get("site_config"); exists {
+			if siteCfg, ok := cfg.(loaders.SiteConfig); ok {
+				smtp = siteCfg.SMTP
+			}
+		}
+
+		if smtp.Host == "" {
+			// Fallback to VirtualHosts
+			if site, ok := globals.VirtualHosts[host]; ok {
+				smtp = site.SMTP
+			}
+		}
+
+		if smtp.Host == "" {
+			log.Warn("SendmailHandler() | Access denied or SMTP not configured | Host: %s | URL: %s", host, c.Request.URL)
+			err = fmt.Errorf("access denied or SMTP not configured for host %s", host)
 			c.Error(utils.NewHTTPError(http.StatusForbidden, err.Error()))
 			return
 		}
@@ -47,20 +62,20 @@ func SendmailHandler() gin.HandlerFunc {
 		request.Email = utils.SanitizeInput(request.Email)
 		request.Message = utils.SanitizeInput(request.Message)
 		if request.Name == "" || request.Email == "" || request.Message == "" {
-			log.Error("SendmailHandler() | Invalid input after sanitization. %s", err.Error())
+			log.Error("SendmailHandler() | Invalid input after sanitization.")
 			log.Sync()
 			err = fmt.Errorf("invalid input after sanitization")
 			c.Error(utils.NewHTTPError(http.StatusBadRequest, err.Error()))
 			return
 		}
 
-		smtpHost := site.SMTP.Host
-		smtpPort := fmt.Sprintf("%d", site.SMTP.Port)
+		smtpHost := smtp.Host
+		smtpPort := fmt.Sprintf("%d", smtp.Port)
 		addr := smtpHost + ":" + smtpPort
-		passwordDecrypted, err := security.DecryptPassword(site.SMTP.Password)
+		passwordDecrypted, err := security.DecryptPassword(smtp.Password)
 
-		from := site.SMTP.Username
-		to := site.SMTP.Username
+		from := smtp.Username
+		to := smtp.Username
 		subject := fmt.Sprintf("Message from %s", request.Name)
 		body := fmt.Sprintf("Name: %s\nEmail: %s\nMessage: %s", request.Name, request.Email, request.Message)
 		message := []byte(fmt.Sprintf("To: %s\r\n"+
@@ -99,9 +114,9 @@ func SendmailHandler() gin.HandlerFunc {
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, err.Error()))
 			return
 		}
-		auth := smtp.PlainAuth("", from, passwordDecrypted, smtpHost)
+		auth := gosmtp.PlainAuth("", from, passwordDecrypted, smtpHost)
 
-		client, err := smtp.Dial(addr)
+		client, err := gosmtp.Dial(addr)
 		if err != nil {
 			log.Error("SendmailHandler() | Failed to connect to SMTP: %v", err.Error())
 			log.Sync()

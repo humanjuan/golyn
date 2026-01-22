@@ -1,34 +1,70 @@
 package middlewares
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/humanjuan/acacia/v2"
-	"github.com/humanjuan/golyn/config/loaders"
-	"github.com/humanjuan/golyn/globals"
 	"net/http"
 	"net/url"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/humanjuan/golyn/config/loaders"
+	"github.com/humanjuan/golyn/globals"
 )
 
-func CorsMiddleware(sites []loaders.SiteConfig) gin.HandlerFunc {
+func CorsMiddleware() gin.HandlerFunc {
 	log := globals.GetAppLogger()
-	allowedOrigins := getAllowedOrigins(sites, log)
-	originMap := make(map[string]struct{}, len(allowedOrigins))
-	for _, origin := range allowedOrigins {
-		originMap[origin] = struct{}{}
-	}
 
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-
-		// check if origins it's allow
-		if _, ok := originMap[origin]; ok {
-			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-			c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
-			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		if origin == "" {
+			c.Next()
+			return
 		}
 
-		// handle request pre-flight (OPTIONS)
+		host := strings.Split(c.Request.Host, ":")[0]
+
+		var security loaders.Security
+		if cfg, exists := c.Get("site_config"); exists {
+			if siteCfg, ok := cfg.(loaders.SiteConfig); ok {
+				security = siteCfg.Security
+			}
+		}
+
+		if security.AllowOrigin == nil {
+			if vh, ok := globals.VirtualHosts[host]; ok {
+				security = vh.Security
+			}
+		}
+
+		if len(security.AllowOrigin) > 0 {
+			allowed := false
+			isWildcard := false
+			for _, allowedOrigin := range security.AllowOrigin {
+				if allowedOrigin == "*" {
+					isWildcard = true
+					allowed = true
+				}
+				if origin == allowedOrigin {
+					allowed = true
+					break
+				}
+			}
+
+			if allowed {
+				// Prohibit "*" when Allow-Credentials: true.
+				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+				c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+				c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
+
+				if !isWildcard {
+					c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+				} else {
+					log.Debug("CorsMiddleware() | Credentials disabled for wildcard origin | Host: %s", host)
+				}
+			} else {
+				log.Warn("CorsMiddleware() | Origin not allowed | Host: %s | Origin: %s", host, origin)
+			}
+		}
+
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusOK)
 			return
@@ -36,29 +72,6 @@ func CorsMiddleware(sites []loaders.SiteConfig) gin.HandlerFunc {
 
 		c.Next()
 	}
-}
-
-func getAllowedOrigins(sites []loaders.SiteConfig, log *acacia.Log) []string {
-	originSet := make(map[string]struct{})
-	var allowedOrigins []string
-
-	for _, siteConfig := range sites {
-		if !siteConfig.Enabled {
-			continue
-		}
-		for _, origin := range siteConfig.Security.AllowOrigin {
-			if !isValidURL(origin) {
-				log.Warn("getAllowedOrigins() | Origin URL is not valid | Site: %s | Origin URL: %s", siteConfig.Directory, origin)
-				continue
-			}
-			originSet[origin] = struct{}{}
-		}
-	}
-	for origin := range originSet {
-		allowedOrigins = append(allowedOrigins, origin)
-	}
-	// fmt.Print(allowedOrigins)
-	return allowedOrigins
 }
 
 func isValidURL(u string) bool {

@@ -67,6 +67,8 @@ func Setup(router *gin.Engine) map[string]app.VirtualHost {
 		for _, domain := range siteConfig.Domains {
 			virtualHosts[domain] = app.VirtualHost{
 				HostName:    domain,
+				SiteName:    siteConfig.Directory,
+				ConfigPath:  siteConfig.Path,
 				BasePath:    basePath,
 				SiteGroup:   siteGroup,
 				Proxy:       siteConfig.Proxy,
