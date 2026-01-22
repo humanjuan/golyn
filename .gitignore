@@ -45,6 +45,8 @@ builds/*.gz
 /pkg/sumdb/
 .idea/
 .DS_Store
+**/.DS_Store
+
 /certificates/*
 /docker/taiga/
 /builds/Golyn/
