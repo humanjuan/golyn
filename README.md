@@ -41,9 +41,10 @@ This server is currently **under active development** and continues to expand wi
 - CSRF Protection: Built-in CSRF token generation and validation for forms and API endpoints.
 - Email Rate Limiting: Configurable request rate limiting per site and for email services.
 - TLS/SSL Management:
-    - Per-domain SSL certificate handling
-    - Automatic certificate validation and expiration checking
-    - Fallback mechanisms for invalid certificates
+    - Per-domain SSL certificate handling with full chain support (`chainPath`).
+    - Automatic certificate validation and expiration checking on server startup.
+    - Fallback mechanisms for invalid certificates to maintain server stability.
+    - Support for custom CA or Let's Encrypt certificates.
 
 ### SMTP Email Support
 - Integrated SMTP support for sending emails through the specific endpoint.
@@ -110,8 +111,9 @@ Tokens issued by Golyn follow a minimal and strict claims structure, ensuring an
 
 To mitigate risks like *Token Leakage* in URLs or logs, Golyn uses a strictly cookie-based delivery mechanism (**Backend-owned sessions**):
 
-- **`access_token`**: Stored in a cookie with `HttpOnly`, `Secure`, and `SameSite=Lax` attributes. The authentication middleware looks for it automatically.
+- **Access Token**: Stored in a cookie with `HttpOnly`, `Secure`, and `SameSite=Lax` attributes. The authentication middleware looks for it automatically.
 - **`refreshToken`**: Stored in an `HttpOnly` and `Secure` cookie, used exclusively to obtain new access tokens without requiring user intervention.
+- **SSL Connection**: Encrypted connection to PostgreSQL database (configurable via `ssl = true`).
 
 > **Note**: Tokens are never included in the JSON response body to prevent access from malicious scripts (XSS). All authentication is handled transparently by the browser via secure cookies.
 
@@ -140,9 +142,12 @@ Logout is comprehensive and secure:
 
 ### Audit & Security
 
-- **Auditing**: All events (local login, OAuth2, refreshes, logout) are logged in `audit.auth_events` with IP and User-Agent.
-- **Token Rotation**: Implements a rotation system that invalidates old sessions when starting new ones (configurable).
+- **Role Hierarchy**: System based on weights (`SuperAdmin=3`, `Admin=2`, `User=1`) to prevent unauthorized privilege escalation.
+- **Granular Permissions**: Fine-grained access control using `grants` and `denies` per user.
+- **Auditing**: All events (local login, OAuth2, refreshes, logout, and permission changes) are logged in `audit.auth_events` with IP and User-Agent.
+- **Token Rotation**: Implements a rotation system that invalidates old sessions when starting new ones.
 - **Revocation**: Administrators can revoke tokens globally per user.
+- **Database SSL**: Support for encrypted connections to PostgreSQL with CA verification.
 
 ### Transport Security
 
@@ -167,15 +172,33 @@ Golyn is designed with a "Security First" approach. Our production configuration
 | `/csrf-token` | `GET` | **Security**: Obtain a fresh CSRF token (Required for mutable requests). |
 | `/send-mail` | `POST` | **Communication**: Send emails (Requires CSRF & Rate limited). |
 | `/ping` | `GET` | **Health Check**: Verify server status. |
-| `/version` | `GET` | **Version**: Current build information. |
+| `/version` | `GET` | **Version**: Current build information (includes `serverStartTime` for dynamic uptime sync). |
 
 ## Administration API
 
 Golyn includes a protected API for platform management, allowing administrators to manage sites and users programmatically. All admin endpoints require a JWT with `SuperAdmin` or `Admin` roles.
 
-### Administrative Roles
-- **SuperAdmin**: Full access to all administrative functions.
-- **Admin**: Restricted administrative access (e.g., managing a specific set of users).
+### Administrative Roles & Hierarchy
+Golyn implements a strict hierarchical role system based on weights to ensure that lower-level users cannot manage higher-level ones.
+
+| Role | Weight | Description |
+| :--- | :---: | :--- |
+| **`superadmin`** | 3 | Full platform authority. Can change user roles and manage anyone. |
+| **`admin`** | 2 | Operational management. Can manage `user` accounts but not other Admins or SuperAdmins. |
+| **`user`** | 1 | Base role. No administrative access by default. Requires explicit `grants`. |
+
+**Management Rules**:
+- **Actor > Target**: An administrator can only edit, delete, or manage permissions for users with a **strictly lower** weight.
+- **Role Assignment**: When creating or updating a user, the actor can only assign roles with a lower weight than their own (except SuperAdmin).
+
+### Granular Permissions (Grants & Denies)
+For users with the `user` role, access to the `/admin` API is delegated through specific permissions:
+
+- **Users**: `users.view`, `users.create`, `users.update`, `users.delete`, `users.manage`.
+- **Sites**: `sites.view`, `sites.create`, `sites.update`, `sites.delete`.
+- **System**: `system.logs`, `system.stats`, `system.info`.
+
+Permissions are evaluated using a "Deny First" policy: if a permission is in the `denies` list, access is blocked even if it exists in `grants`.
 
 ### Key Endpoints (`/api/v1/admin`)
 
@@ -194,7 +217,7 @@ Golyn includes a protected API for platform management, allowing administrators 
 | `/permissions/catalog` | `GET` | **Permissions Catalog**: Get all available platform permissions. |
 | `/logs` | `GET` | **System Logs**: View server or database logs (SuperAdmin only). |
 | `/stats` | `GET` | **Platform Stats**: Overview of users, sites and system health. |
-| `/info` | `GET` | **Server Info**: Detailed technical info about the instance (SuperAdmin only). |
+| `/info` | `GET` | **Server Info**: Detailed technical info about the instance (includes dynamic `uptime`). |
 
 ### Environment Variables
 
@@ -227,9 +250,13 @@ To run **Golyn** correctly, especially in production environments, you need to d
 
 Security secrets and provider credentials must be defined via environment variables.
 
-### 1. Global Secrets
+### 1. Database & Global Secrets
 ```ini
 # config/server/web_server.conf
+[database]
+ssl = true
+sslRootCert = ./certificates/db/postgres/root.crt
+
 [server]
 tokenExpirationTime = 5         # Access Token duration (minutes)
 tokenExpirationRefreshTime = 1440 # Refresh Token duration (minutes)
@@ -534,8 +561,8 @@ smtp_password=${SMTP_PASS}
 - **Configuration Management:** Custom `.conf` files loaded dynamically.
 - **Logging Library:** Integrated logging for server and database activities.
 - **Static Assets:** Hosted via site-specific directories.
-- **Database Connectivity (Planned):** Configuration includes database setup, skeleton included.
-- **TLS/SSL Support (Planned):** Security-first approach with HTTPS encryption.
+- **Database Connectivity**: Integrated PostgreSQL support using high-performance connection pooling and secure SSL/TLS connections.
+- **TLS/SSL Support**: Security-first approach with A+ grade HTTPS encryption, supporting full certificate chains and per-site configuration.
 
 ---
 
