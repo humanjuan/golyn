@@ -121,4 +121,5 @@ esac
 # ./manage_clients.sh list: Muestra un resumen de todos los sitios y usuarios actuales.
 # ./manage_clients.sh add-site <identificador> <dominio>: Registra un nuevo sitio (ej: add-site empresa-a empresa-a.com).
 # ./manage_clients.sh add-user <sitio> <email> <hash>|<pass>: Crea un usuario vinculado a un sitio. Requiere el hash Bcrypt de la password.
+# ./manage_clients.sh add-user <site_key> <usuario> <password> <rol>
 # ./manage_clients.sh del-site <identificador>: Elimina un sitio y, automáticamente, a todos sus usuarios asociados.
