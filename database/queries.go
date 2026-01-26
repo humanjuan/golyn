@@ -29,8 +29,8 @@ var Queries = map[string]string{
 	"get_site_by_host":   `SELECT id FROM core.sites WHERE lower(host) = lower($1)`,
 
 	// Admin - Users
-	"get_all_users":     `SELECT id, site_id, username, password_hash, role, status, created_at, updated_at FROM auth.users ORDER BY created_at DESC`,
-	"get_users_by_site": `SELECT id, site_id, username, password_hash, role, status, created_at, updated_at FROM auth.users WHERE site_id = $1 ORDER BY username ASC`,
+	"get_all_users":     `SELECT u.id, u.site_id, s.key as site_key, u.username, u.password_hash, u.role, u.status, u.created_at, u.updated_at FROM auth.users u LEFT JOIN core.sites s ON u.site_id = s.id ORDER BY u.created_at DESC`,
+	"get_users_by_site": `SELECT u.id, u.site_id, s.key as site_key, u.username, u.password_hash, u.role, u.status, u.created_at, u.updated_at FROM auth.users u LEFT JOIN core.sites s ON u.site_id = s.id WHERE u.site_id = $1 ORDER BY u.username ASC`,
 	"create_user":       `INSERT INTO auth.users (site_id, username, password_hash, role) VALUES ($1, $2, $3, $4)`,
 	"update_user_role":  `UPDATE auth.users SET role = $1, updated_at = NOW() WHERE lower(username) = lower($2)`,
 	"delete_user":       `DELETE FROM auth.users WHERE lower(username) = lower($1)`,

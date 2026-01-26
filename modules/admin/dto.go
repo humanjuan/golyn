@@ -19,6 +19,7 @@ type SiteDTO struct {
 type AdminUserDTO struct {
 	ID        string     `json:"id"`
 	SiteID    string     `json:"site_id"`
+	SiteKey   string     `json:"site_key"`
 	Username  string     `json:"username"`
 	Role      string     `json:"role"`
 	Status    string     `json:"status"`
@@ -46,6 +47,7 @@ func MapAdminUserToDTO(u database.User) AdminUserDTO {
 	return AdminUserDTO{
 		ID:        u.Id,
 		SiteID:    u.SiteID,
+		SiteKey:   u.SiteKey,
 		Username:  u.Username,
 		Role:      u.Role,
 		Status:    u.Status,
