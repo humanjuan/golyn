@@ -65,6 +65,7 @@ type LoginUser struct {
 type User struct {
 	Id           string     `db:"id"`
 	SiteID       string     `db:"site_id"`
+	SiteKey      string     `db:"site_key"`
 	Username     string     `db:"username"`
 	PasswordHash string     `db:"password_hash"`
 	Role         string     `db:"role"`
