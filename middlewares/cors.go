@@ -39,11 +39,12 @@ func CorsMiddleware() gin.HandlerFunc {
 			allowed := false
 			isWildcard := false
 			for _, allowedOrigin := range security.AllowOrigin {
+				allowedOrigin = strings.TrimSpace(allowedOrigin)
 				if allowedOrigin == "*" {
 					isWildcard = true
 					allowed = true
 				}
-				if origin == allowedOrigin {
+				if origin == allowedOrigin || (origin == "null" && allowedOrigin != "*") {
 					allowed = true
 					break
 				}
