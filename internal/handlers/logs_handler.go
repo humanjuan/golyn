@@ -103,7 +103,11 @@ func GetLogs() gin.HandlerFunc {
 		for scanner.Scan() {
 			line := scanner.Text()
 			logTime, err := utils.ParseLogTimestamp(line)
-			if err != nil || now.Sub(logTime) > customLogTime {
+			if err != nil {
+				log.Debug("Could not parse log line: %v", err)
+				continue
+			}
+			if now.Sub(logTime) > customLogTime {
 				continue
 			}
 			fileLines = append(fileLines, line)
