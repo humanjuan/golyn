@@ -54,6 +54,11 @@ var Queries = map[string]string{
 	// Stats
 	"count_total_users":  `SELECT count(*) FROM auth.users`,
 	"count_active_sites": `SELECT count(*) FROM core.sites WHERE status = 'active'`,
+
+	// Admin - Admin Sites (Multi-tenancy)
+	"assign_site_to_admin":   `INSERT INTO auth.admin_sites (user_id, site_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+	"revoke_site_from_admin": `DELETE FROM auth.admin_sites WHERE user_id = $1 AND site_id = $2`,
+	"get_admin_sites":        `SELECT s.id, s.key, s.host, s.status, s.created_at FROM core.sites s JOIN auth.admin_sites asit ON s.id = asit.site_id WHERE asit.user_id = $1`,
 }
 
 type LoginUser struct {

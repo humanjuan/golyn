@@ -113,3 +113,22 @@ func (dbi *DBInstance) UpdateUserPermissions(username string, permissions []byte
 	_, err := dbi.db.Exec(context.Background(), query, permissions, username)
 	return err
 }
+
+func (dbi *DBInstance) AssignSiteToAdmin(userID, siteID string) error {
+	query := Queries["assign_site_to_admin"]
+	_, err := dbi.db.Exec(context.Background(), query, userID, siteID)
+	return err
+}
+
+func (dbi *DBInstance) RevokeSiteFromAdmin(userID, siteID string) error {
+	query := Queries["revoke_site_from_admin"]
+	_, err := dbi.db.Exec(context.Background(), query, userID, siteID)
+	return err
+}
+
+func (dbi *DBInstance) GetAdminSites(userID string) ([]Site, error) {
+	var sites []Site
+	query := Queries["get_admin_sites"]
+	err := dbi.Select(query, &sites, userID)
+	return sites, err
+}

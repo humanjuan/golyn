@@ -32,6 +32,7 @@ type Security struct {
 	AllowOrigin           []string
 	ContentSecurityPolicy string
 	PermissionsPolicy     string
+	AutoJWT               bool
 	TLS_SSL               TLS_SSL
 }
 type SiteConfig struct {
@@ -445,6 +446,7 @@ func LoadSiteConfig(name string, path string, basePath string, server Server) (S
 	security.AllowOrigin = siteSettings.Key("allowOrigin").Strings(",")
 	security.ContentSecurityPolicy = strings.Trim(siteSettings.Key("contentSecurityPolicy").String(), "\"")
 	security.PermissionsPolicy = strings.Trim(siteSettings.Key("permissionsPolicy").String(), "\"")
+	security.AutoJWT, _, _ = CheckBool(siteSettings.Key("autoJWT"), false, sectionName, "autoJWT")
 	siteConfig.Security = security
 
 	// SMTP

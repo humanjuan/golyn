@@ -11,6 +11,8 @@ func RegisterAdminRoutes(router *gin.RouterGroup, serverInfo *app.Info) {
 	// Site management
 	router.POST("/sites", middlewares.GrantMiddleware("sites.create"), admin.CreateSite())
 	router.GET("/sites", middlewares.GrantMiddleware("sites.view"), admin.ListSites())
+	router.GET("/sites/configurations", middlewares.GrantMiddleware("sites.view"), admin.GetSitesConfigurations())
+	router.GET("/sites/:key/configuration", middlewares.GrantMiddleware("sites.view"), admin.GetSiteConfiguration())
 	router.DELETE("/sites/:key", middlewares.GrantMiddleware("sites.delete"), admin.DeleteSite())
 	router.PATCH("/sites/:key/status", middlewares.GrantMiddleware("sites.update"), admin.UpdateSiteStatus())
 
@@ -26,8 +28,14 @@ func RegisterAdminRoutes(router *gin.RouterGroup, serverInfo *app.Info) {
 	router.PUT("/users/:username/permissions", middlewares.GrantMiddleware("users.manage"), admin.UpdateUserPermissions())
 	router.GET("/permissions/catalog", middlewares.GrantMiddleware("users.manage"), admin.GetPermissionsCatalog())
 
+	// Multi-site management
+	router.GET("/users/:username/sites", middlewares.GrantMiddleware("users.manage"), admin.GetAdminManagedSites())
+	router.POST("/users/:username/sites", middlewares.GrantMiddleware("users.manage"), admin.AssignSiteToAdmin())
+	router.DELETE("/users/:username/sites/:key", middlewares.GrantMiddleware("users.manage"), admin.RevokeSiteFromAdmin())
+
 	// System & Observability
 	router.GET("/logs", middlewares.GrantMiddleware("system.logs"), admin.GetLogs())
 	router.GET("/stats", middlewares.GrantMiddleware("system.stats"), admin.GetStats())
 	router.GET("/info", middlewares.GrantMiddleware("system.info"), admin.GetInfo(serverInfo))
+	router.GET("/server/configuration", middlewares.GrantMiddleware("system.config"), admin.GetServerConfiguration())
 }

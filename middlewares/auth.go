@@ -68,6 +68,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		if claims, ok := token.Claims.(*platjwt.Claims); ok && token.Valid {
 			c.Set("subject", claims.Subject)
 			c.Set("site_id", claims.SiteID)
+			c.Set("managed_sites", claims.ManagedSites)
 
 			// Add roles check support
 			db := globals.GetDBInstance()

@@ -16,8 +16,29 @@ import (
 	"github.com/humanjuan/golyn/database"
 	"github.com/humanjuan/golyn/globals"
 	"github.com/humanjuan/golyn/internal/handlers"
+	"github.com/humanjuan/golyn/internal/security/hierarchy"
 	"github.com/humanjuan/golyn/internal/utils"
 )
+
+// GetServerConfiguration returns global server configuration for SuperAdmin
+func GetServerConfiguration() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, _ := c.Get("role")
+		actorRole := strings.ToLower(fmt.Sprintf("%v", role))
+
+		if actorRole != hierarchy.RoleSuperAdmin {
+			c.Error(utils.NewHTTPError(http.StatusForbidden, "only SuperAdmin can access global server configuration"))
+			c.Abort()
+			return
+		}
+
+		config := globals.GetConfig()
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Data:    MapServerConfigToDTO(config),
+		})
+	}
+}
 
 // GetLogs reuses the existing log handling logic
 func GetLogs() gin.HandlerFunc {
@@ -31,7 +52,7 @@ func GetStats() gin.HandlerFunc {
 		db := globals.GetDBInstance()
 
 		var totalUsers int
-		var activeSites int
+		var jwtEnabledSites int
 
 		// Get User count
 		err := db.GetPool().QueryRow(context.Background(), database.Queries["count_total_users"]).Scan(&totalUsers)
@@ -40,7 +61,7 @@ func GetStats() gin.HandlerFunc {
 		}
 
 		// Get Active Sites count
-		err = db.GetPool().QueryRow(context.Background(), database.Queries["count_active_sites"]).Scan(&activeSites)
+		err = db.GetPool().QueryRow(context.Background(), database.Queries["count_active_sites"]).Scan(&jwtEnabledSites)
 		if err != nil {
 			log.Error("GetStats() | Error counting active sites: %v", err)
 		}
@@ -54,11 +75,21 @@ func GetStats() gin.HandlerFunc {
 			systemHealth = "unhealthy"
 		}
 
+		// Count sites with JWT active in configuration
+		active_sites := 0
+		config := globals.GetConfig()
+		for _, site := range config.Sites {
+			if site.Enabled {
+				active_sites++
+			}
+		}
+
 		c.JSON(http.StatusOK, gin.H{
-			"total_users":   totalUsers,
-			"active_sites":  activeSites,
-			"recent_errors": recentErrors,
-			"system_health": systemHealth,
+			"total_users":       totalUsers,
+			"jwt_enabled_sites": jwtEnabledSites,
+			"active_sites":      active_sites,
+			"recent_errors":     recentErrors,
+			"system_health":     systemHealth,
 		})
 	}
 }

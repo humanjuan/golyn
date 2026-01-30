@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/humanjuan/golyn/config/loaders"
 	"github.com/humanjuan/golyn/database"
 	"github.com/humanjuan/golyn/globals"
 	"github.com/humanjuan/golyn/internal/security/hierarchy"
@@ -391,6 +392,241 @@ func UpdateUserRole() gin.HandlerFunc {
 		c.JSON(http.StatusOK, utils.APIResponse{
 			Success: true,
 			Message: "user role updated successfully",
+		})
+	}
+}
+
+// GetSitesConfigurations returns the configuration for all sites the user has access to.
+// SuperAdmin: All sites
+// Admin: Sites they manage (based on site_id or managed_sites claim)
+func GetSitesConfigurations() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, _ := c.Get("role")
+		actorRole := strings.ToLower(fmt.Sprintf("%v", role))
+		userSiteID, _ := c.Get("site_id")
+		managedSitesVal, _ := c.Get("managed_sites")
+		managedSites, _ := managedSitesVal.([]string)
+
+		config := globals.GetConfig()
+		var accessibleConfigs []SiteConfigDTO
+
+		for _, site := range config.Sites {
+			if actorRole == hierarchy.RoleSuperAdmin {
+				accessibleConfigs = append(accessibleConfigs, MapSiteConfigToDTO(site))
+				continue
+			}
+
+			if actorRole == hierarchy.RoleAdmin {
+				isAllowed := false
+				for _, domain := range site.Domains {
+					domainLower := strings.ToLower(domain)
+					// Check primary site_id
+					if domainLower == strings.ToLower(fmt.Sprintf("%v", userSiteID)) {
+						isAllowed = true
+						break
+					}
+					// Check additional managed sites
+					for _, ms := range managedSites {
+						if domainLower == strings.ToLower(ms) {
+							isAllowed = true
+							break
+						}
+					}
+					if isAllowed {
+						break
+					}
+				}
+
+				if isAllowed {
+					accessibleConfigs = append(accessibleConfigs, MapSiteConfigToDTO(site))
+				}
+			}
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Data:    accessibleConfigs,
+		})
+	}
+}
+
+// GetSiteConfiguration returns technical configuration for a specific site by key.
+func GetSiteConfiguration() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		key := strings.ToLower(c.Param("key"))
+		role, _ := c.Get("role")
+		actorRole := strings.ToLower(fmt.Sprintf("%v", role))
+		userSiteID, _ := c.Get("site_id")
+		managedSitesVal, _ := c.Get("managed_sites")
+		managedSites, _ := managedSitesVal.([]string)
+
+		config := globals.GetConfig()
+		var targetSite *loaders.SiteConfig
+
+		for i := range config.Sites {
+			if strings.ToLower(config.Sites[i].Directory) == key {
+				targetSite = &config.Sites[i]
+				break
+			}
+		}
+
+		if targetSite == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "site configuration not found"))
+			c.Abort()
+			return
+		}
+
+		// Authorization Check
+		if actorRole != hierarchy.RoleSuperAdmin {
+			allowed := false
+			for _, domain := range targetSite.Domains {
+				domainLower := strings.ToLower(domain)
+				if domainLower == strings.ToLower(fmt.Sprintf("%v", userSiteID)) {
+					allowed = true
+					break
+				}
+				for _, ms := range managedSites {
+					if domainLower == strings.ToLower(ms) {
+						allowed = true
+						break
+					}
+				}
+				if allowed {
+					break
+				}
+			}
+
+			if !allowed {
+				c.Error(utils.NewHTTPError(http.StatusForbidden, "you do not have permission to view this site configuration"))
+				c.Abort()
+				return
+			}
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Data:    MapSiteConfigToDTO(*targetSite),
+		})
+	}
+}
+
+type AssignSiteRequest struct {
+	SiteKey string `json:"site_key" binding:"required"`
+}
+
+func AssignSiteToAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := globals.GetAppLogger()
+		username := strings.ToLower(c.Param("username"))
+
+		var req AssignSiteRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "invalid request body"))
+			c.Abort()
+			return
+		}
+
+		db := globals.GetDBInstance()
+
+		// Get User
+		user, err := db.GetUserByUsername(username)
+		if err != nil || user == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "user not found"))
+			c.Abort()
+			return
+		}
+
+		// Get Site
+		site, err := db.GetSiteByKey(strings.ToLower(req.SiteKey))
+		if err != nil || site == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "site not found"))
+			c.Abort()
+			return
+		}
+
+		err = db.AssignSiteToAdmin(user.Id, site.Id)
+		if err != nil {
+			log.Error("Admin.AssignSiteToAdmin() | Failed to assign site: %v", err)
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to assign site"))
+			c.Abort()
+			return
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: "site assigned successfully",
+		})
+	}
+}
+
+func RevokeSiteFromAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := globals.GetAppLogger()
+		username := strings.ToLower(c.Param("username"))
+		siteKey := strings.ToLower(c.Param("key"))
+
+		db := globals.GetDBInstance()
+
+		// Get User
+		user, err := db.GetUserByUsername(username)
+		if err != nil || user == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "user not found"))
+			c.Abort()
+			return
+		}
+
+		// Get Site
+		site, err := db.GetSiteByKey(siteKey)
+		if err != nil || site == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "site not found"))
+			c.Abort()
+			return
+		}
+
+		err = db.RevokeSiteFromAdmin(user.Id, site.Id)
+		if err != nil {
+			log.Error("Admin.RevokeSiteFromAdmin() | Failed to revoke site: %v", err)
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to revoke site"))
+			c.Abort()
+			return
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: "site revoked successfully",
+		})
+	}
+}
+
+func GetAdminManagedSites() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		username := strings.ToLower(c.Param("username"))
+
+		db := globals.GetDBInstance()
+
+		// Get User
+		user, err := db.GetUserByUsername(username)
+		if err != nil || user == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "user not found"))
+			c.Abort()
+			return
+		}
+
+		sites, err := db.GetAdminSites(user.Id)
+		if err != nil {
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to get managed sites"))
+			c.Abort()
+			return
+		}
+
+		dtos := make([]SiteDTO, len(sites))
+		for i, s := range sites {
+			dtos[i] = MapSiteToDTO(s)
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Data:    dtos,
 		})
 	}
 }
