@@ -12,10 +12,11 @@ import (
 type Claims struct {
 	SiteID       string   `json:"site_id"`
 	ManagedSites []string `json:"managed_sites,omitempty"`
+	SessionID    int64    `json:"session_id,omitempty"`
 	jwt.RegisteredClaims
 }
 
-func CreateToken(subject string, siteID string) (string, string, error) {
+func CreateToken(subject string, siteID string, ip, ua string) (string, string, error) {
 	config := globals.GetConfig()
 	log := globals.GetAppLogger()
 	db := globals.GetDBInstance()
@@ -43,9 +44,44 @@ func CreateToken(subject string, siteID string) (string, string, error) {
 		managedSitesHosts[i] = s.Host
 	}
 
+	err = db.RevokeAllUserRefreshTokens(userUUID)
+	if err != nil {
+		log.Critical("CreateToken() | Unable to revoke refresh token. %s", err.Error())
+		return "", "", errors.New("unable to revoke old refresh token")
+	}
+
+	// We store the refresh token first to get the SessionID
+	refreshExpirationTime := time.Now().Add(time.Duration(tokenExpirationRefreshTime) * time.Minute)
+	refreshClaims := &Claims{
+		SiteID:       siteID,
+		ManagedSites: managedSitesHosts,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   subject,
+			Issuer:    "Golyn",
+			Audience:  jwt.ClaimStrings{"GolynPlatform"},
+			ExpiresAt: jwt.NewNumericDate(refreshExpirationTime),
+			IssuedAt:  jwt.NewNumericDate(issuedAt),
+		},
+	}
+
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
+	refreshTokenString, err := refreshToken.SignedString(jwtKey)
+	if err != nil {
+		log.Error("CreateToken() | Unable to sign refresh token. %s", err.Error())
+		return "", "", errors.New("unable to sign refresh token")
+	}
+
+	sessionID, err := db.StoreRefreshToken(refreshTokenString, userUUID, refreshExpirationTime, ip, ua)
+	if err != nil {
+		log.Error("CreateToken() | Unable to store refresh token. %s", err.Error())
+		return "", "", errors.New("unable to store refresh token")
+	}
+
+	// Now we include the SessionID in the access token claims
 	claims := &Claims{
 		SiteID:       siteID,
 		ManagedSites: managedSitesHosts,
+		SessionID:    sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   subject,
 			Issuer:    "Golyn",
@@ -62,44 +98,12 @@ func CreateToken(subject string, siteID string) (string, string, error) {
 		return "", "", errors.New("unable to sign token")
 	}
 
-	refreshExpirationTime := time.Now().Add(time.Duration(tokenExpirationRefreshTime) * time.Minute)
-	refreshClaims := &Claims{
-		SiteID:       siteID,
-		ManagedSites: managedSitesHosts,
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   subject,
-			Issuer:    "Golyn",
-			Audience:  jwt.ClaimStrings{"GolynPlatform"},
-			ExpiresAt: jwt.NewNumericDate(refreshExpirationTime),
-			IssuedAt:  jwt.NewNumericDate(issuedAt),
-		},
-	}
-
-	err = db.RevokeAllUserRefreshTokens(userUUID)
-	if err != nil {
-		log.Critical("CreateToken() | Unable to revoke refresh token. %s", err.Error())
-		return "", "", errors.New("unable to revoke old refresh token")
-	}
-
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
-	refreshTokenString, err := refreshToken.SignedString(jwtKey)
-	if err != nil {
-		log.Error("CreateToken() | Unable to sign refresh token. %s", err.Error())
-		return "", "", errors.New("unable to sign refresh token")
-	}
-
-	err = db.StoreRefreshToken(refreshTokenString, userUUID, refreshExpirationTime)
-	if err != nil {
-		log.Error("CreateToken() | Unable to store refresh token. %s", err.Error())
-		return "", "", errors.New("unable to store refresh token")
-	}
-
 	return tokenString, refreshTokenString, nil
 }
 
-func CreateTokenWithRevocation(subject string, siteID string, revokeOthers bool) (string, string, error) {
+func CreateTokenWithRevocation(subject string, siteID string, revokeOthers bool, ip, ua string) (string, string, error) {
 	if revokeOthers {
-		return CreateToken(subject, siteID)
+		return CreateToken(subject, siteID, ip, ua)
 	}
 
 	config := globals.GetConfig()
@@ -125,24 +129,7 @@ func CreateTokenWithRevocation(subject string, siteID string, revokeOthers bool)
 		managedSitesHosts[i] = s.Host
 	}
 
-	claims := &Claims{
-		SiteID:       siteID,
-		ManagedSites: managedSitesHosts,
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   subject,
-			Issuer:    "Golyn",
-			Audience:  jwt.ClaimStrings{"GolynPlatform"},
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-			IssuedAt:  jwt.NewNumericDate(issuedAt),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(jwtKey)
-	if err != nil {
-		return "", "", errors.New("unable to sign token")
-	}
-
+	// We store the refresh token first to get the SessionID
 	refreshExpirationTime := time.Now().Add(time.Duration(tokenExpirationRefreshTime) * time.Minute)
 	refreshClaims := &Claims{
 		SiteID:       siteID,
@@ -162,9 +149,28 @@ func CreateTokenWithRevocation(subject string, siteID string, revokeOthers bool)
 		return "", "", errors.New("unable to sign refresh token")
 	}
 
-	err = db.StoreRefreshToken(refreshTokenString, userUUID, refreshExpirationTime)
+	sessionID, err := db.StoreRefreshToken(refreshTokenString, userUUID, refreshExpirationTime, ip, ua)
 	if err != nil {
 		return "", "", errors.New("unable to store refresh token")
+	}
+
+	claims := &Claims{
+		SiteID:       siteID,
+		ManagedSites: managedSitesHosts,
+		SessionID:    sessionID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   subject,
+			Issuer:    "Golyn",
+			Audience:  jwt.ClaimStrings{"GolynPlatform"},
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(issuedAt),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		return "", "", errors.New("unable to sign token")
 	}
 
 	return tokenString, refreshTokenString, nil
@@ -196,7 +202,7 @@ func ValidateRefreshToken(refreshToken string) (*Claims, error) {
 	}
 }
 
-func IssueNewTokens(refreshToken string, claims *Claims) (string, string, error) {
+func IssueNewTokens(refreshToken string, claims *Claims, ip, ua string) (string, string, error) {
 	db := globals.GetDBInstance()
 	subject := claims.Subject
 	if subject == "" {
@@ -220,7 +226,7 @@ func IssueNewTokens(refreshToken string, claims *Claims) (string, string, error)
 		return "", "", errors.New("refresh token has expired in database")
 	}
 
-	accessToken, newRefreshTokenString, err := CreateTokenWithRevocation(subject, siteID, false)
+	accessToken, newRefreshTokenString, err := CreateTokenWithRevocation(subject, siteID, false, ip, ua)
 	if err != nil {
 		return "", "", fmt.Errorf("unable to issue new tokens: %w", err)
 	}
