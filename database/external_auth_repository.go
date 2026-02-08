@@ -9,7 +9,7 @@ func (dbi *DBInstance) GetExternalIdentity(provider, externalID string) (*Extern
 	var identity ExternalIdentity
 	query := Queries["get_external_identity"]
 
-	row := dbi.db.QueryRow(context.Background(), query, provider, externalID)
+	row := dbi.QueryRow(context.Background(), query, provider, externalID)
 	err := row.Scan(
 		&identity.Id,
 		&identity.UserId,
@@ -47,7 +47,7 @@ func (dbi *DBInstance) GetUserByEmail(email string) (*User, error) {
 func (dbi *DBInstance) LinkExternalIdentity(userID, provider, externalID, email string, metadata []byte) error {
 	query := Queries["link_external_identity"]
 
-	_, err := dbi.db.Exec(context.Background(), query, userID, provider, externalID, email, metadata)
+	_, err := dbi.Exec(context.Background(), query, userID, provider, externalID, email, metadata)
 	if err != nil {
 		return fmt.Errorf("unable to link external identity: %w", err)
 	}
@@ -57,6 +57,6 @@ func (dbi *DBInstance) LinkExternalIdentity(userID, provider, externalID, email 
 
 func (dbi *DBInstance) RegisterAuthEvent(userID, siteID *string, event, ip, userAgent string) error {
 	query := Queries["register_auth_event"]
-	_, err := dbi.db.Exec(context.Background(), query, userID, siteID, event, ip, userAgent)
+	_, err := dbi.Exec(context.Background(), query, userID, siteID, event, ip, userAgent)
 	return err
 }

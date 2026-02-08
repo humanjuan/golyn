@@ -84,7 +84,7 @@ func UpdateTheme() gin.HandlerFunc {
 
 		db := globals.GetDBInstance()
 		query := database.Queries["update_user_theme"]
-		_, err = db.GetPool().Exec(c.Request.Context(), query, themeJSON, username)
+		_, err = db.Exec(c.Request.Context(), query, themeJSON, username)
 
 		if err != nil {
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "Failed to save theme preferences"))
