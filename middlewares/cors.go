@@ -44,17 +44,34 @@ func CorsMiddleware() gin.HandlerFunc {
 					isWildcard = true
 					allowed = true
 				}
+
+				// Exact match
 				if origin == allowedOrigin || (origin == "null" && allowedOrigin != "*") {
 					allowed = true
 					break
+				}
+
+				// Dev mode: Allow same domain with different port
+				config := globals.GetConfig()
+				if config.Server.Dev && !allowed {
+					parsedOrigin, err := url.Parse(origin)
+					parsedAllowed, err2 := url.Parse(allowedOrigin)
+					if err == nil && err2 == nil {
+						if parsedOrigin.Hostname() == parsedAllowed.Hostname() &&
+							parsedOrigin.Scheme == parsedAllowed.Scheme {
+							log.Debug("CorsMiddleware() | Allowing dev origin by hostname match | Origin: %s | AllowedBase: %s", origin, allowedOrigin)
+							allowed = true
+							break
+						}
+					}
 				}
 			}
 
 			if allowed {
 				// Prohibit "*" when Allow-Credentials: true.
 				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-				c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-				c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
+				c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+				c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization, X-CSRF-Token, X-Requested-With")
 
 				if !isWildcard {
 					c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")

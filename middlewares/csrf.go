@@ -14,22 +14,22 @@ import (
 
 func CSRFMiddleware() gin.HandlerFunc {
 	log := globals.GetAppLogger()
-	log.Debug("CSRFMiddleware()")
+	// Removed redundant Debug log inside handler to avoid noise if needed,
+	// but kept it if you want to see every check.
 
 	return func(c *gin.Context) {
-		virtualhosts := globals.VirtualHosts
-		if c.Request.Method != http.MethodPost {
+		// Only check state-changing methods
+		method := c.Request.Method
+		if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions || method == http.MethodTrace {
 			c.Next()
 			return
 		}
 
-		host := strings.Split(c.Request.Host, ":")[0]
-		if _, exists := virtualhosts[host]; !exists {
-			log.Warn("CSRFMiddleware() | Access denied | Host: %s | URL: %s", host, c.Request.URL)
-			c.Error(utils.NewHTTPError(http.StatusForbidden, "Host not configured in VirtualHosts"))
-			c.Abort()
-			return
+		if log != nil {
+			log.Debug("CSRFMiddleware() | Checking CSRF for %s %s", method, c.Request.URL.Path)
 		}
+
+		host := strings.Split(c.Request.Host, ":")[0]
 
 		cookie, err := c.Cookie("csrf_token")
 		if err != nil {
@@ -44,8 +44,15 @@ func CSRFMiddleware() gin.HandlerFunc {
 			token = c.PostForm("csrf_token")
 		}
 
-		if token == "" || token != cookie {
-			log.Warn("CSRFMiddleware() | Invalid CSRF token | Host: %s | URL: %s", host, c.Request.URL)
+		if token == "" {
+			log.Warn("CSRFMiddleware() | CSRF token missing in request | Host: %s | URL: %s", host, c.Request.URL)
+			c.Error(utils.NewHTTPError(http.StatusForbidden, "csrf token missing"))
+			c.Abort()
+			return
+		}
+
+		if token != cookie {
+			log.Warn("CSRFMiddleware() | CSRF token mismatch | Host: %s | URL: %s", host, c.Request.URL)
 			c.Error(utils.NewHTTPError(http.StatusForbidden, "invalid csrf token"))
 			c.Abort()
 			return
@@ -57,15 +64,7 @@ func CSRFMiddleware() gin.HandlerFunc {
 func GenerateCSRFToken(c *gin.Context) {
 	log := globals.GetAppLogger()
 	log.Debug("GenerateCSRFToken()")
-	virtualhosts := globals.VirtualHosts
 	host := strings.Split(c.Request.Host, ":")[0]
-
-	if _, exists := virtualhosts[host]; !exists {
-		log.Warn("GenerateCSRFToken() | Access denied | Host: %s | URL: %s", host, c.Request.URL)
-		c.Error(utils.NewHTTPError(http.StatusForbidden, "Host not configured in VirtualHosts"))
-		c.Abort()
-		return
-	}
 
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
@@ -76,7 +75,7 @@ func GenerateCSRFToken(c *gin.Context) {
 	}
 	token := base64.StdEncoding.EncodeToString(tokenBytes)
 	c.SetSameSite(utils.StringToSameSite(globals.GetConfig().Server.CookieSameSite))
-	c.SetCookie("csrf_token", token, int(time.Hour.Seconds()), "/", "", globals.GetConfig().Server.CookieSecure, globals.GetConfig().Server.CookieHttpOnly)
+	c.SetCookie("csrf_token", token, int(time.Hour.Seconds()), "/", globals.GetConfig().Server.CookieDomain, globals.GetConfig().Server.CookieSecure, globals.GetConfig().Server.CookieHttpOnly)
 	log.Debug("GenerateCSRFToken() | CSRF token generated for %s", host)
 	c.JSON(http.StatusOK, gin.H{
 		"csrf_token": token,

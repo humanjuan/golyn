@@ -17,12 +17,12 @@ func ConfigureRoutes(router *gin.Engine, serverInfo *app.Info, mainDomain string
 		v1.RegisterPublicRoutes(v1Group, serverInfo)
 
 		// Private
-		v1PrivateGroup := v1Group.Group("/", middlewares.AuthMiddleware())
+		v1PrivateGroup := v1Group.Group("/", middlewares.AuthMiddleware(), middlewares.CSRFMiddleware())
 		{
 			v1.RegisterPrivateRoutes(v1PrivateGroup)
 
 			// Admin
-			adminGroup := v1PrivateGroup.Group("/admin")
+			adminGroup := v1PrivateGroup.Group("/admin", middlewares.RestrictAdminHostMiddleware(mainDomain, dev))
 			v1.RegisterAdminRoutes(adminGroup, serverInfo)
 		}
 	}
@@ -34,7 +34,7 @@ func ConfigureRoutes(router *gin.Engine, serverInfo *app.Info, mainDomain string
 		v2.RegisterPublicRoutes(v2Group, serverInfo)
 
 		// Private
-		v2PrivateGroup := v2Group.Group("/", middlewares.AuthMiddleware())
+		v2PrivateGroup := v2Group.Group("/", middlewares.AuthMiddleware(), middlewares.CSRFMiddleware())
 		{
 			v2.RegisterPrivateRoutes(v2PrivateGroup)
 		}
