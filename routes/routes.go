@@ -12,22 +12,31 @@ import (
 func ConfigureRoutes(router *gin.Engine, serverInfo *app.Info, mainDomain string, dev bool) {
 	//  ====== V1 API ======
 	v1Group := router.Group("/api/v1", middlewares.RestrictAPIRequestMiddleware(dev))
-	v1.RegisterPublicRoutes(v1Group, serverInfo)
+	{
+		// Public
+		v1.RegisterPublicRoutes(v1Group, serverInfo)
 
-	v1PrivateGroup := v1Group.Group("/", middlewares.RestrictAPIRequestMiddleware(dev))
-	v1PrivateGroup.Use(middlewares.AuthMiddleware())
-	v1.RegisterPrivateRoutes(v1PrivateGroup)
+		// Private
+		v1PrivateGroup := v1Group.Group("/", middlewares.AuthMiddleware(), middlewares.CSRFMiddleware())
+		{
+			v1.RegisterPrivateRoutes(v1PrivateGroup)
+
+			// Admin
+			adminGroup := v1PrivateGroup.Group("/admin", middlewares.RestrictAdminHostMiddleware(mainDomain, dev))
+			v1.RegisterAdminRoutes(adminGroup, serverInfo)
+		}
+	}
 
 	//  ====== V2 API ======
 	v2Group := router.Group("/api/v2", middlewares.RestrictAPIRequestMiddleware(dev))
-	v2.RegisterPublicRoutes(v2Group, serverInfo)
+	{
+		// Public
+		v2.RegisterPublicRoutes(v2Group, serverInfo)
 
-	v2PrivateGroup := v2Group.Group("/", middlewares.RestrictAPIRequestMiddleware(dev))
-	v2PrivateGroup.Use(middlewares.AuthMiddleware())
-	v2.RegisterPrivateRoutes(v2PrivateGroup)
-
-	//  ====== ADMIN API ======
-	adminGroup := router.Group("/api/v1/admin", middlewares.RestrictAPIRequestMiddleware(dev))
-	adminGroup.Use(middlewares.AuthMiddleware())
-	RegisterAdminRoutes(adminGroup, serverInfo)
+		// Private
+		v2PrivateGroup := v2Group.Group("/", middlewares.AuthMiddleware(), middlewares.CSRFMiddleware())
+		{
+			v2.RegisterPrivateRoutes(v2PrivateGroup)
+		}
+	}
 }

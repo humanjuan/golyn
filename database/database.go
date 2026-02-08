@@ -7,7 +7,7 @@ import (
 )
 
 func (dbi *DBInstance) Select(query string, result interface{}, args ...interface{}) error {
-	rows, err := dbi.db.Query(context.Background(), query, args...)
+	rows, err := dbi.Query(context.Background(), query, args...)
 	if err != nil {
 		return err
 	}

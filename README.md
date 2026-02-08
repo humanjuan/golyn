@@ -4,7 +4,7 @@
 
 ![Golang](https://img.shields.io/badge/Language-Go-blue?logo=go)
 ![Open Source](https://img.shields.io/badge/Open%20Source-Yes-brightgreen?logo=opensourceinitiative)
-![Status](https://img.shields.io/badge/Status-In%20Development-orange?logo=githubactions)
+![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen?logo=githubactions)
 ![SSL Labs A+](https://img.shields.io/badge/SSL%20Labs-A%2B-brightgreen?logo=ssl)
 ![Go Version](https://img.shields.io/badge/Go-v1.25.0-blue?logo=go)
 [![Gin Version](https://img.shields.io/badge/Gin%20Framework-v1.10.0-lightblue)](https://github.com/gin-gonic/gin)
@@ -16,7 +16,7 @@
 
 The **Golyn Server** is a custom-built, multi-site web server designed to host and manage multiple websites efficiently. The primary purpose of this project is to host my **personal portfolio**, while also supporting additional websites thanks to its robust multi-site capabilities.
 
-This server is currently **under active development** and continues to expand with new features and optimizations.
+This server is now in production, actively maintained and continuously improved with new features and optimizations.
 
 ---
 
@@ -24,12 +24,13 @@ This server is currently **under active development** and continues to expand wi
 
 ### Hosting Your Portfolio
 - The server is primarily designed to **host and serve my personal portfolio** and its dedicated administration panel. It includes a **multi-site architecture**, allowing it to manage and host any additional websites, providing flexibility to support a variety of projects or domains under the same infrastructure.
-- **Backend-owned Authentication**: Implements a highly secure authentication system using HttpOnly cookies, CSRF protection, and standardized DTOs, ensuring professional-grade security for all hosted sites.
 
-### Multi-Site Hosting
-- Golyn Server is designed to handle multiple sites simultaneously. Each site is configurable and isolated, making it suitable for various use cases such as personal projects, portfolios, or other hosted websites.
-- Configurations for each site are stored in dedicated files, enabling granular control over site-specific settings like domains, paths, proxy settings, SMTP, and security policies.
-- Built-in support for multiple domains and subdomains with individual TLS/SSL certificate management.
+### Professional Multi-Site Management
+- **Multi-tenant Architecture**: Handle multiple sites simultaneously. Each site is isolated with its own configuration.
+- **Admin Tenancy**: Administrators can be assigned to manage multiple specific sites. Access is strictly isolated between managed domains.
+- **Dynamic Auth Providers**: Centralized management of OAuth2 providers (Entra ID, Google, GitHub) allowing runtime updates via API/UI.
+- **API Key Management**: Generate long-lived tokens with specific scopes for programmatic access and external integrations.
+- **Advanced Monitoring**: Role-based filtered logs and platform statistics. Admins only see logs for their assigned sites.
 
 ### Secure and Configurable
 - Flexible configuration through `.conf` files for server-level and site-specific settings.
@@ -55,6 +56,11 @@ This server is currently **under active development** and continues to expand wi
 - Includes reverse proxy capabilities to forward requests to other servers or services.
 - Configurable via the site-specific `.conf` files to define proxy rules, such as forwarding specific routes to backend services or external APIs.
 - Supports secure proxying with HTTPS and configurable headers for enhanced flexibility.
+
+### Administration UI Support
+- **Full JSON API**: Standardized responses for easy integration with frontend frameworks (e.g., `golyn-ui`).
+- **Dashboard Stats**: Real-time overview of active sites, JWT-enabled domains, user counts, and system health.
+- **Self-Service**: Users can manage their own active sessions and theme preferences.
 
 ### Performance Optimization
 - Advanced Compression:
@@ -92,7 +98,16 @@ Golyn features a robust, secure, and orchestrated extension system that allows e
 
 Golyn provides a centralized multi-site identity platform using standardized JWT contracts, secure cookies, and a robust OAuth2/SSO broker.
 
-### Platform JWT Contract
+#### Identity Isolation (Multi-tenancy)
+
+The platform supports two identity scopes to balance between Single Sign-On (SSO) convenience and strict tenant isolation:
+
+- **Global Identity (`is_global: true`)**: The user is recognized as a single entity across the entire Golyn platform. They can log in from any configured site/host. Ideal for internal staff or cross-platform services.
+- **Restricted Identity (`is_global: false`)**: The user is strictly tied to specific sites. Access is denied if they try to log in from a host not present in their authorized list.
+    - **Primary Site**: The site where the user was originally created.
+    - **Allowed Sites**: Additional sites explicitly granted to the user via the Admin API.
+
+#### Platform JWT Contract
 
 Tokens issued by Golyn follow a minimal and strict claims structure, ensuring any consumer module can trust the identity without knowing Golyn's internal logic.
 
@@ -100,6 +115,7 @@ Tokens issued by Golyn follow a minimal and strict claims structure, ensuring an
 | :--- | :--- | :--- |
 | `sub` | UUID/String | **Subject**: Unique and stable user identifier. |
 | `site_id` | UUID | **Tenant/Organization**: The unique site/context identifier. |
+| `managed_sites` | Array | **Multi-Tenancy**: List of hosts the user is authorized to manage. |
 | `iat` | Numeric | **Issued At**: Token generation timestamp. |
 | `exp` | Numeric | **Expiration**: Security limit for token validity. |
 | `iss` | String | **Issuer**: Always set to `"Golyn"`. |
@@ -122,9 +138,16 @@ To mitigate risks like *Token Leakage* in URLs or logs, Golyn uses a strictly co
 Golyn acts as an **Identity Broker**, allowing users to authenticate through their corporate or personal accounts from major providers.
 
 #### Supported Providers:
-- **Microsoft Azure AD** (Entra ID)
-- **Google**
-- **GitHub**
+- **Microsoft Entra ID** (antes Azure AD)
+- **Google** (Verifica `email_verified`)
+- **GitHub** (Fuerza correo `Primary` y `Verified`)
+- **Apple** (Validación completa de JWT/JWKS y `email_verified`)
+- **LinkedIn** (API v2)
+- **Facebook (Meta)** (Graph API)
+- **Amazon** (Login with Amazon)
+- **SalesForce** (Identity API con `email_verified`)
+- **X (Twitter)**
+- **Generic OIDC**
 
 #### Authentication Flow:
 1.  **Redirection**: Send the user to `GET /api/v1/auth/{provider}/login`.
@@ -167,12 +190,13 @@ Golyn is designed with a "Security First" approach. Our production configuration
 | `/logout` | `POST` | **Logout**: Revoke tokens and clear cookies. |
 | `/refresh_token` | `POST` | **Token Refresh**: Rotates cookies (Returns 204 No Content). |
 | `/auth/me` | `GET` | **Profile**: Get current authenticated user details. |
+| `/auth/sessions` | `GET/DELETE` | **Self-Service**: Manage your own active sessions. |
 | `/user/theme` | `GET/PUT` | **Theme**: Manage user interface preferences. |
 | `/auth/:provider/login`| `GET` | **OAuth2 Login**: Initiate SSO flow. |
 | `/csrf-token` | `GET` | **Security**: Obtain a fresh CSRF token (Required for mutable requests). |
 | `/send-mail` | `POST` | **Communication**: Send emails (Requires CSRF & Rate limited). |
 | `/ping` | `GET` | **Health Check**: Verify server status. |
-| `/version` | `GET` | **Version**: Current build information (includes `serverStartTime` for dynamic uptime sync). |
+| `/version` | `GET` | **Version**: Current build information. |
 
 ## Administration API
 
@@ -204,20 +228,31 @@ Permissions are evaluated using a "Deny First" policy: if a permission is in the
 
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
-| `/sites` | `POST` | **Create Site**: Register a new tenant (requires `key` and `host`). |
+| `/sites` | `POST` | **Create Site**: Register a new tenant. |
 | `/sites` | `GET` | **List Sites**: Retrieve all registered organizations. |
+| `/sites/configurations` | `GET` | **Site Configs**: View technical settings for accessible sites. |
+| `/sites/:key/configuration` | `GET` | **Site Detail**: Full technical config for a specific site. |
 | `/sites/:key` | `DELETE` | **Delete Site**: Remove a site and its configurations. |
 | `/sites/:key/status` | `PATCH` | **Update Site Status**: Enable or disable a site. |
-| `/users` | `POST` | **Create User**: Add a user to a site (requires `site_key`, `username`, `password`). |
+| `/users` | `POST` | **Create User**: Add a user to a site. |
 | `/users` | `GET` | **List Users**: List all users or filter by `site_key`. |
 | `/users/:username` | `DELETE` | **Delete User**: Remove a user account. |
-| `/users/:username/status` | `PATCH` | **Update Status**: Change user account status (active, inactive). |
+| `/users/:username/status` | `PATCH` | **Update Status**: Change user account status. |
 | `/users/:username/role` | `PUT` | **Update Role**: Change user administrative privileges. |
 | `/users/:username/permissions`| `GET/PUT` | **Manage Permissions**: Get or update specific user grants/denies. |
-| `/permissions/catalog` | `GET` | **Permissions Catalog**: Get all available platform permissions. |
-| `/logs` | `GET` | **System Logs**: View server or database logs (SuperAdmin only). |
+| `/users/:username/sites` | `GET/POST` | **Multi-site**: Manage sites assigned to an administrator. |
+| `/users/:username/allowed-sites`| `GET/POST` | **Isolation**: Manage sites allowed for a restricted user. |
+| `/users/:username/allowed-sites/:key`| `DELETE` | **Isolation**: Revoke site access for a restricted user. |
+| `/users/:username/remove-allowed-sites`| `POST` | **Isolation**: Bulk remove sites from a user. |
+| `/sites/:key/allowed-users` | `POST` | **Isolation**: Bulk assign users to a specific site. |
+| `/sites/:key/remove-allowed-users` | `POST` | **Isolation**: Bulk remove users from a site. |
+| `/tokens` | `GET/POST` | **API Keys**: Manage long-lived tokens for integrations. |
+| `/sessions/active` | `GET/DELETE` | **Active Sessions**: Monitor and terminate active system sessions. |
+| `/auth/providers` | `GET/PUT` | **Auth Providers**: Configure OAuth2 credentials at runtime. |
+| `/security/policies` | `GET` | **Policies**: View effective CSP and Rate Limit policies. |
+| `/logs` | `GET` | **System Logs**: View server/DB logs (filtered for Admins). |
 | `/stats` | `GET` | **Platform Stats**: Overview of users, sites and system health. |
-| `/info` | `GET` | **Server Info**: Detailed technical info about the instance (includes dynamic `uptime`). |
+| `/server/configuration` | `GET` | **Server Config**: Global technical settings (SuperAdmin only). |
 
 ### Environment Variables
 
@@ -230,13 +265,34 @@ To run **Golyn** correctly, especially in production environments, you need to d
 | `GOOGLE_CLIENT_ID` | Client ID for Google OAuth2 integration. | `xxx-yyy.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | Client Secret for Google OAuth2 integration. | `GOCSPX-xxxxxx` |
 | `GOOGLE_REDIRECT_URL` | Callback URL for Google OAuth2. | `https://your-domain.com/api/v1/auth/google/callback` |
-| `AZURE_CLIENT_ID` | Client ID for Microsoft Azure (Entra ID). | `your-azure-app-id` |
-| `AZURE_CLIENT_SECRET` | Client Secret for Microsoft Azure. | `your-azure-secret` |
-| `AZURE_TENANT_ID` | Tenant ID for your Azure organization. | `your-tenant-id` |
-| `AZURE_REDIRECT_URL` | Callback URL for Azure OAuth2. | `https://your-domain.com/api/v1/auth/azure/callback` |
+| `AZURE_CLIENT_ID` | Client ID for Microsoft Entra ID (antes Azure AD). | `your-azure-app-id` |
+| `AZURE_CLIENT_SECRET` | Client Secret for Microsoft Entra ID. | `your-azure-secret` |
+| `AZURE_TENANT_ID` | Tenant ID for your Microsoft Entra ID organization. | `your-tenant-id` |
+| `AZURE_REDIRECT_URL` | Callback URL for Microsoft Entra ID OAuth2. | `https://your-domain.com/api/v1/auth/azure/callback` |
 | `GITHUB_CLIENT_ID` | Client ID for GitHub OAuth2 integration. | `github_client_id` |
 | `GITHUB_CLIENT_SECRET` | Client Secret for GitHub OAuth2. | `github_client_secret` |
 | `GITHUB_REDIRECT_URL` | Callback URL for GitHub OAuth2. | `https://your-domain.com/api/v1/auth/github/callback` |
+| `APPLE_CLIENT_ID` | Client ID for Apple OAuth2. | `your-apple-id` |
+| `APPLE_CLIENT_SECRET` | Client Secret for Apple OAuth2. | `your-apple-secret` |
+| `APPLE_REDIRECT_URL` | Callback URL for Apple OAuth2. | `https://your-domain.com/api/v1/auth/apple/callback` |
+| `X_CLIENT_ID` | Client ID for X (Twitter) OAuth2. | `your-x-id` |
+| `X_CLIENT_SECRET` | Client Secret for X (Twitter) OAuth2. | `your-x-secret` |
+| `X_REDIRECT_URL` | Callback URL for X OAuth2. | `https://your-domain.com/api/v1/auth/x/callback` |
+| `OIDC_CLIENT_ID` | Client ID for Generic OIDC. | `your-oidc-id` |
+| `OIDC_CLIENT_SECRET` | Client Secret for Generic OIDC. | `your-oidc-secret` |
+| `OIDC_REDIRECT_URL` | Callback URL for OIDC. | `https://your-domain.com/api/v1/auth/oidc/callback` |
+| `LINKEDIN_CLIENT_ID` | Client ID for LinkedIn OAuth2. | `linkedin_id` |
+| `LINKEDIN_CLIENT_SECRET`| Client Secret for LinkedIn OAuth2. | `linkedin_secret` |
+| `LINKEDIN_REDIRECT_URL`| Callback URL for LinkedIn OAuth2. | `https://your-domain.com/api/v1/auth/linkedin/callback` |
+| `FACEBOOK_CLIENT_ID` | Client ID for Facebook OAuth2. | `facebook_id` |
+| `FACEBOOK_CLIENT_SECRET`| Client Secret for Facebook OAuth2. | `facebook_secret` |
+| `FACEBOOK_REDIRECT_URL`| Callback URL for Facebook OAuth2. | `https://your-domain.com/api/v1/auth/facebook/callback` |
+| `AMAZON_CLIENT_ID` | Client ID for Amazon OAuth2. | `amazon_id` |
+| `AMAZON_CLIENT_SECRET` | Client Secret for Amazon OAuth2. | `amazon_secret` |
+| `AMAZON_REDIRECT_URL` | Callback URL for Amazon OAuth2. | `https://your-domain.com/api/v1/auth/amazon/callback` |
+| `SALESFORCE_CLIENT_ID` | Client ID for SalesForce OAuth2. | `salesforce_id` |
+| `SALESFORCE_CLIENT_SECRET`| Client Secret for SalesForce OAuth2. | `salesforce_secret` |
+| `SALESFORCE_REDIRECT_URL`| Callback URL for SalesForce OAuth2. | `https://your-domain.com/api/v1/auth/salesforce/callback` |
 | `GOLYN_AI_SECRET` | Secret key for the Golyn-AI extension handshake. | Required if `golyn-ai` is enabled. |
 | `GOLYN_KEY_PHRASE` | Key phrase used as salt/integrity check for password encryption. | Used for AES-256-GCM credentials protection. |
 | `GOLYN_SECRET_KEY` | Master secret key for encrypting/decrypting sensitive data. | 32-character string for AES-256. |
@@ -477,14 +533,6 @@ The server is developed in **Golang** and, as part of its architecture, uses the
 
 ---
 
-## Project Status
-
-🚧 **Under Development** 🚧  
-This project is still a **work in progress**
-
-Even though the server is still under development, it is fully functional for its primary purpose. If you install the server and configure your site correctly, you will be able to serve it without issues. This includes the ability to properly view your website's content through browsers, supporting secure communication over HTTPS if configured with the necessary certificates.
-
----
 
 ## How It Works
 

@@ -66,8 +66,24 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		if claims, ok := token.Claims.(*platjwt.Claims); ok && token.Valid {
+			// Validation: Check if the session is still active in the database
+			if claims.SessionID != 0 {
+				db := globals.GetDBInstance()
+				var revoked bool
+				err := db.QueryRow(c.Request.Context(), "SELECT revoked FROM auth.refresh_tokens WHERE id = $1", claims.SessionID).Scan(&revoked)
+				if err != nil || revoked {
+					log.Warn("AuthMiddleware() | Session revoked or not found | ClientIP: %s | SessionID: %d", clientIP, claims.SessionID)
+					log.Sync()
+					c.Error(utils.NewHTTPError(http.StatusUnauthorized, "session has been terminated"))
+					c.Abort()
+					return
+				}
+			}
+
 			c.Set("subject", claims.Subject)
 			c.Set("site_id", claims.SiteID)
+			c.Set("managed_sites", claims.ManagedSites)
+			c.Set("session_id", claims.SessionID)
 
 			// Add roles check support
 			db := globals.GetDBInstance()

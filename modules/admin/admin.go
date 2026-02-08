@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/humanjuan/golyn/config/loaders"
 	"github.com/humanjuan/golyn/database"
 	"github.com/humanjuan/golyn/globals"
 	"github.com/humanjuan/golyn/internal/security/hierarchy"
@@ -19,10 +20,12 @@ type CreateSiteRequest struct {
 }
 
 type CreateUserRequest struct {
-	SiteKey  string `json:"site_key" binding:"required"`
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-	Role     string `json:"role"`
+	SiteKey    string `json:"site_key"`
+	Username   string `json:"username" binding:"required"`
+	Password   string `json:"password"`
+	Role       string `json:"role"`
+	IsGlobal   *bool  `json:"is_global"`
+	IsExternal *bool  `json:"is_external"`
 }
 
 func CreateSite() gin.HandlerFunc {
@@ -150,23 +153,44 @@ func CreateUser() gin.HandlerFunc {
 		}
 
 		db := globals.GetDBInstance()
-		req.SiteKey = strings.ToLower(req.SiteKey)
 		req.Username = strings.ToLower(req.Username)
 		req.Role = strings.ToLower(req.Role)
-		site, err := db.GetSiteByKey(req.SiteKey)
-		if err != nil || site == nil {
-			c.Error(utils.NewHTTPError(http.StatusNotFound, "site not found"))
-			c.Abort()
-			return
+
+		isGlobal := true
+		if req.IsGlobal != nil {
+			isGlobal = *req.IsGlobal
 		}
 
-		if req.Role == "" {
-			req.Role = "user"
+		isExternal := false
+		if req.IsExternal != nil {
+			isExternal = *req.IsExternal
+		}
+
+		var siteID *string
+		if req.SiteKey != "" {
+			site, err := db.GetSiteByKey(strings.ToLower(req.SiteKey))
+			if err != nil || site == nil {
+				c.Error(utils.NewHTTPError(http.StatusNotFound, "site not found"))
+				c.Abort()
+				return
+			}
+			siteID = &site.Id
+		}
+
+		// Validation: if NOT global, site_key is required
+		if !isGlobal && siteID == nil {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "site_key is required for restricted users"))
+			c.Abort()
+			return
 		}
 
 		// Role Hierarchy Check
 		actorRoleVal, _ := c.Get("role")
 		actorRole := strings.ToLower(fmt.Sprintf("%v", actorRoleVal))
+		if req.Role == "" {
+			req.Role = "user"
+		}
+
 		if !hierarchy.CanCreate(actorRole, req.Role) {
 			log.Warn("Admin.CreateUser() | Hierarchy Violation | Actor: %s (%s) tried to create: %s", c.GetString("subject"), actorRole, req.Role)
 			c.Error(utils.NewHTTPError(http.StatusForbidden, "hierarchy violation: cannot create user with higher or equal role"))
@@ -174,8 +198,18 @@ func CreateUser() gin.HandlerFunc {
 			return
 		}
 
-		hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
-		err = db.CreateUser(site.Id, req.Username, string(hashedPassword), req.Role)
+		var hashedPassword string
+		if req.Password != "" {
+			hash, _ := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
+			hashedPassword = string(hash)
+		} else {
+			// Random long password for external users if not provided
+			randomPass := utils.GenerateRandomString(64)
+			hash, _ := bcrypt.GenerateFromPassword([]byte(randomPass), 10)
+			hashedPassword = string(hash)
+		}
+
+		err := db.CreateUser(siteID, req.Username, hashedPassword, req.Role, isGlobal, isExternal)
 		if err != nil {
 			log.Error("Admin.CreateUser() | Failed to create user: %v", err)
 			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to create user"))
@@ -391,6 +425,576 @@ func UpdateUserRole() gin.HandlerFunc {
 		c.JSON(http.StatusOK, utils.APIResponse{
 			Success: true,
 			Message: "user role updated successfully",
+		})
+	}
+}
+
+// GetSitesConfigurations returns the configuration for all sites the user has access to.
+// SuperAdmin: All sites
+// Admin: Sites they manage (based on site_id or managed_sites claim)
+func GetSitesConfigurations() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, _ := c.Get("role")
+		actorRole := strings.ToLower(fmt.Sprintf("%v", role))
+		userSiteID, _ := c.Get("site_id")
+		managedSitesVal, _ := c.Get("managed_sites")
+		managedSites, _ := managedSitesVal.([]string)
+
+		db := globals.GetDBInstance()
+		dbSites, _ := db.GetAllSites()
+		// Create a map for quick lookup of DB status by key/directory
+		siteStatusMap := make(map[string]string)
+		for _, ds := range dbSites {
+			siteStatusMap[strings.ToLower(ds.Key)] = ds.Status
+		}
+
+		config := globals.GetConfig()
+		var accessibleConfigs []SiteConfigDTO
+
+		for _, site := range config.Sites {
+			if actorRole == hierarchy.RoleSuperAdmin {
+				dto := MapSiteConfigToDTO(site)
+				// Override enabled status with DB status if available
+				if status, ok := siteStatusMap[strings.ToLower(site.Directory)]; ok {
+					dto.Enabled = status == "active"
+				}
+				accessibleConfigs = append(accessibleConfigs, dto)
+				continue
+			}
+
+			if actorRole == hierarchy.RoleAdmin {
+				isAllowed := false
+				for _, domain := range site.Domains {
+					domainLower := strings.ToLower(domain)
+					// Check primary site_id
+					if userSiteID != nil && domainLower == strings.ToLower(fmt.Sprintf("%v", userSiteID)) {
+						isAllowed = true
+						break
+					}
+					// Check additional managed sites
+					for _, ms := range managedSites {
+						if domainLower == strings.ToLower(ms) {
+							isAllowed = true
+							break
+						}
+					}
+					if isAllowed {
+						break
+					}
+				}
+
+				if isAllowed {
+					dto := MapSiteConfigToDTO(site)
+					// Override enabled status with DB status if available
+					if status, ok := siteStatusMap[strings.ToLower(site.Directory)]; ok {
+						dto.Enabled = status == "active"
+					}
+					accessibleConfigs = append(accessibleConfigs, dto)
+				}
+			}
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Data:    accessibleConfigs,
+		})
+	}
+}
+
+// GetSiteConfiguration returns technical configuration for a specific site by key.
+func GetSiteConfiguration() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		key := strings.ToLower(c.Param("key"))
+		role, _ := c.Get("role")
+		actorRole := strings.ToLower(fmt.Sprintf("%v", role))
+		userSiteID, _ := c.Get("site_id")
+		managedSitesVal, _ := c.Get("managed_sites")
+		managedSites, _ := managedSitesVal.([]string)
+
+		config := globals.GetConfig()
+		var targetSite *loaders.SiteConfig
+
+		for i := range config.Sites {
+			if strings.ToLower(config.Sites[i].Directory) == key {
+				targetSite = &config.Sites[i]
+				break
+			}
+		}
+
+		if targetSite == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "site configuration not found"))
+			c.Abort()
+			return
+		}
+
+		// Authorization Check
+		if actorRole != hierarchy.RoleSuperAdmin {
+			allowed := false
+			for _, domain := range targetSite.Domains {
+				domainLower := strings.ToLower(domain)
+				if domainLower == strings.ToLower(fmt.Sprintf("%v", userSiteID)) {
+					allowed = true
+					break
+				}
+				for _, ms := range managedSites {
+					if domainLower == strings.ToLower(ms) {
+						allowed = true
+						break
+					}
+				}
+				if allowed {
+					break
+				}
+			}
+
+			if !allowed {
+				c.Error(utils.NewHTTPError(http.StatusForbidden, "you do not have permission to view this site configuration"))
+				c.Abort()
+				return
+			}
+		}
+
+		db := globals.GetDBInstance()
+		dbSite, _ := db.GetSiteByKey(key)
+		dto := MapSiteConfigToDTO(*targetSite)
+		if dbSite != nil {
+			dto.Enabled = dbSite.Status == "active"
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Data:    dto,
+		})
+	}
+}
+
+type AssignSiteRequest struct {
+	SiteKey string `json:"site_key" binding:"required"`
+}
+
+type BulkAssignUsersRequest struct {
+	Usernames []string `json:"usernames" binding:"required"`
+}
+
+func AssignSiteToAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := globals.GetAppLogger()
+		username := strings.ToLower(c.Param("username"))
+
+		var req AssignSiteRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "invalid request body"))
+			c.Abort()
+			return
+		}
+
+		db := globals.GetDBInstance()
+
+		// Get User
+		user, err := db.GetUserByUsername(username)
+		if err != nil || user == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "user not found"))
+			c.Abort()
+			return
+		}
+
+		// Get Site
+		site, err := db.GetSiteByKey(strings.ToLower(req.SiteKey))
+		if err != nil || site == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "site not found"))
+			c.Abort()
+			return
+		}
+
+		err = db.AssignSiteToAdmin(user.Id, site.Id)
+		if err != nil {
+			log.Error("Admin.AssignSiteToAdmin() | Failed to assign site: %v", err)
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to assign site"))
+			c.Abort()
+			return
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: "site assigned successfully",
+		})
+	}
+}
+
+func RevokeSiteFromAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := globals.GetAppLogger()
+		username := strings.ToLower(c.Param("username"))
+		siteKey := strings.ToLower(c.Param("key"))
+
+		db := globals.GetDBInstance()
+
+		// Get User
+		user, err := db.GetUserByUsername(username)
+		if err != nil || user == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "user not found"))
+			c.Abort()
+			return
+		}
+
+		// Get Site
+		site, err := db.GetSiteByKey(siteKey)
+		if err != nil || site == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "site not found"))
+			c.Abort()
+			return
+		}
+
+		err = db.RevokeSiteFromAdmin(user.Id, site.Id)
+		if err != nil {
+			log.Error("Admin.RevokeSiteFromAdmin() | Failed to revoke site: %v", err)
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to revoke site"))
+			c.Abort()
+			return
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: "site revoked successfully",
+		})
+	}
+}
+
+// User Allowed Sites (Isolation)
+
+func GetUserAllowedSites() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		username := strings.ToLower(c.Param("username"))
+		db := globals.GetDBInstance()
+		user, err := db.GetUserByUsername(username)
+		if err != nil || user == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "user not found"))
+			c.Abort()
+			return
+		}
+
+		sites, err := db.GetUserAllowedSites(user.Id)
+		if err != nil {
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to list allowed sites"))
+			c.Abort()
+			return
+		}
+
+		dtos := make([]SiteDTO, len(sites))
+		for i, s := range sites {
+			dtos[i] = MapSiteToDTO(s)
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Data:    dtos,
+		})
+	}
+}
+
+func AssignAllowedSiteToUser() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := globals.GetAppLogger()
+		username := strings.ToLower(c.Param("username"))
+		var req AssignSiteRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "invalid request body"))
+			c.Abort()
+			return
+		}
+
+		db := globals.GetDBInstance()
+		user, err := db.GetUserByUsername(username)
+		if err != nil || user == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "user not found"))
+			c.Abort()
+			return
+		}
+
+		site, err := db.GetSiteByKey(strings.ToLower(req.SiteKey))
+		if err != nil || site == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "site not found"))
+			c.Abort()
+			return
+		}
+
+		// Auto-isolation: Change to is_global = false when segmenting
+		if user.IsGlobal {
+			err = db.UpdateUserGlobalStatus(user.Username, false)
+			if err != nil {
+				log.Error("Admin.AssignAllowedSiteToUser() | Failed to update global status: %v", err)
+			}
+		}
+
+		err = db.AddAllowedSiteToUser(user.Id, site.Id)
+		if err != nil {
+			log.Error("Admin.AssignAllowedSiteToUser() | Failed to assign site: %v", err)
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to assign allowed site to user"))
+			c.Abort()
+			return
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: "site assigned to user successfully",
+		})
+	}
+}
+
+func BulkAssignUsersToSite() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := globals.GetAppLogger()
+		siteKey := strings.ToLower(c.Param("key"))
+
+		var req BulkAssignUsersRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "invalid request body"))
+			c.Abort()
+			return
+		}
+
+		db := globals.GetDBInstance()
+		site, err := db.GetSiteByKey(siteKey)
+		if err != nil || site == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "site not found"))
+			c.Abort()
+			return
+		}
+
+		var succeeded []string
+		var failed []string
+
+		for _, username := range req.Usernames {
+			username = strings.ToLower(username)
+			user, err := db.GetUserByUsername(username)
+			if err != nil || user == nil {
+				failed = append(failed, fmt.Sprintf("%s (not found)", username))
+				continue
+			}
+
+			// Auto-isolation
+			if user.IsGlobal {
+				err = db.UpdateUserGlobalStatus(user.Username, false)
+				if err != nil {
+					log.Error("Admin.BulkAssignUsersToSite() | Failed to update global status for %s: %v", username, err)
+				}
+			}
+
+			err = db.AddAllowedSiteToUser(user.Id, site.Id)
+			if err != nil {
+				log.Error("Admin.BulkAssignUsersToSite() | Failed to assign site to %s: %v", username, err)
+				failed = append(failed, fmt.Sprintf("%s (database error)", username))
+			} else {
+				succeeded = append(succeeded, username)
+			}
+		}
+
+		message := "bulk assignment completed"
+		if len(failed) > 0 {
+			message = fmt.Sprintf("bulk assignment completed with some errors: %d succeeded, %d failed", len(succeeded), len(failed))
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: message,
+			Data: gin.H{
+				"succeeded": succeeded,
+				"failed":    failed,
+			},
+		})
+	}
+}
+
+func BulkRemoveUsersFromSite() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		siteKey := strings.ToLower(c.Param("key"))
+		var req BulkAssignUsersRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "invalid request body"))
+			c.Abort()
+			return
+		}
+
+		db := globals.GetDBInstance()
+		site, err := db.GetSiteByKey(siteKey)
+		if err != nil || site == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "site not found"))
+			c.Abort()
+			return
+		}
+
+		var succeeded []string
+		var failed []string
+
+		for _, username := range req.Usernames {
+			username = strings.ToLower(username)
+			user, err := db.GetUserByUsername(username)
+			if err != nil || user == nil {
+				failed = append(failed, fmt.Sprintf("%s (not found)", username))
+				continue
+			}
+
+			err = db.RemoveAllowedSiteFromUser(user.Id, site.Id)
+			if err != nil {
+				failed = append(failed, fmt.Sprintf("%s (database error)", username))
+			} else {
+				succeeded = append(succeeded, username)
+
+				// Revert to Global if no more allowed sites and no primary site
+				if !user.IsGlobal && user.SiteID == nil {
+					remainingSites, _ := db.GetUserAllowedSites(user.Id)
+					if len(remainingSites) == 0 {
+						_ = db.UpdateUserGlobalStatus(user.Username, true)
+						globals.GetAppLogger().Info("Admin.BulkRemoveUsersFromSite() | User %s reverted to Global (no sites left)", user.Username)
+					}
+				}
+			}
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: "bulk removal completed",
+			Data: gin.H{
+				"succeeded": succeeded,
+				"failed":    failed,
+			},
+		})
+	}
+}
+
+func BulkRemoveSitesFromUser() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		username := strings.ToLower(c.Param("username"))
+		var req struct {
+			SiteKeys []string `json:"site_keys" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.Error(utils.NewHTTPError(http.StatusBadRequest, "invalid request body"))
+			c.Abort()
+			return
+		}
+
+		db := globals.GetDBInstance()
+		user, err := db.GetUserByUsername(username)
+		if err != nil || user == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "user not found"))
+			c.Abort()
+			return
+		}
+
+		var succeeded []string
+		var failed []string
+
+		for _, siteKey := range req.SiteKeys {
+			siteKey = strings.ToLower(siteKey)
+			site, err := db.GetSiteByKey(siteKey)
+			if err != nil || site == nil {
+				failed = append(failed, fmt.Sprintf("%s (not found)", siteKey))
+				continue
+			}
+
+			err = db.RemoveAllowedSiteFromUser(user.Id, site.Id)
+			if err != nil {
+				failed = append(failed, fmt.Sprintf("%s (database error)", siteKey))
+			} else {
+				succeeded = append(succeeded, siteKey)
+			}
+		}
+
+		// Revert to Global if no more allowed sites and no primary site
+		if !user.IsGlobal && user.SiteID == nil {
+			remainingSites, _ := db.GetUserAllowedSites(user.Id)
+			if len(remainingSites) == 0 {
+				_ = db.UpdateUserGlobalStatus(user.Username, true)
+				globals.GetAppLogger().Info("Admin.BulkRemoveSitesFromUser() | User %s reverted to Global (no sites left)", user.Username)
+			}
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: "bulk removal completed",
+			Data: gin.H{
+				"succeeded": succeeded,
+				"failed":    failed,
+			},
+		})
+	}
+}
+
+func RemoveAllowedSiteFromUser() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := globals.GetAppLogger()
+		username := strings.ToLower(c.Param("username"))
+		siteKey := strings.ToLower(c.Param("key"))
+
+		db := globals.GetDBInstance()
+		user, err := db.GetUserByUsername(username)
+		if err != nil || user == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "user not found"))
+			c.Abort()
+			return
+		}
+
+		site, err := db.GetSiteByKey(siteKey)
+		if err != nil || site == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "site not found"))
+			c.Abort()
+			return
+		}
+
+		err = db.RemoveAllowedSiteFromUser(user.Id, site.Id)
+		if err != nil {
+			log.Error("Admin.RemoveAllowedSiteFromUser() | Failed to remove site: %v", err)
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to remove allowed site from user"))
+			c.Abort()
+			return
+		}
+
+		// Revert to Global if no more allowed sites and no primary site
+		if !user.IsGlobal && user.SiteID == nil {
+			remainingSites, _ := db.GetUserAllowedSites(user.Id)
+			if len(remainingSites) == 0 {
+				_ = db.UpdateUserGlobalStatus(user.Username, true)
+				log.Info("Admin.RemoveAllowedSiteFromUser() | User %s reverted to Global (no sites left)", user.Username)
+			}
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Message: "allowed site removed from user successfully",
+		})
+	}
+}
+
+func GetAdminManagedSites() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		username := strings.ToLower(c.Param("username"))
+
+		db := globals.GetDBInstance()
+
+		// Get User
+		user, err := db.GetUserByUsername(username)
+		if err != nil || user == nil {
+			c.Error(utils.NewHTTPError(http.StatusNotFound, "user not found"))
+			c.Abort()
+			return
+		}
+
+		sites, err := db.GetAdminSites(user.Id)
+		if err != nil {
+			c.Error(utils.NewHTTPError(http.StatusInternalServerError, "failed to get managed sites"))
+			c.Abort()
+			return
+		}
+
+		dtos := make([]SiteDTO, len(sites))
+		for i, s := range sites {
+			dtos[i] = MapSiteToDTO(s)
+		}
+
+		c.JSON(http.StatusOK, utils.APIResponse{
+			Success: true,
+			Data:    dtos,
 		})
 	}
 }

@@ -15,6 +15,10 @@ type CSPReportPayload struct {
 		BlockedURI        string `json:"blocked-uri"`
 		ViolatedDirective string `json:"violated-directive"`
 		OriginalPolicy    string `json:"original-policy"`
+		SourceFile        string `json:"source-file"`
+		LineNumber        int    `json:"line-number"`
+		ColumnNumber      int    `json:"column-number"`
+		ScriptSample      string `json:"script-sample"`
 	} `json:"csp-report"`
 }
 
@@ -33,6 +37,14 @@ func CSPReportHandler(c *gin.Context) {
 	log.Warn("  - Document: %s", r.DocumentURI)
 	log.Warn("  - Blocked: %s", r.BlockedURI)
 	log.Warn("  - Directive: %s", r.ViolatedDirective)
+
+	if r.SourceFile != "" {
+		log.Warn("  - Source: %s (Line: %d, Col: %d)", r.SourceFile, r.LineNumber, r.ColumnNumber)
+	}
+
+	if r.ScriptSample != "" {
+		log.Warn("  - Sample: %s", r.ScriptSample)
+	}
 
 	c.Status(http.StatusNoContent)
 }

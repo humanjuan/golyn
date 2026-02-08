@@ -29,6 +29,7 @@ go.work.sum
 
 # MAC
 .DS_Store
+**/.DS_Store
 
 # build
 *.gz

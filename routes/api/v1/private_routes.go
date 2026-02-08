@@ -8,6 +8,8 @@ import (
 
 func RegisterPrivateRoutes(router *gin.RouterGroup) {
 	router.GET("/auth/me", auth.GetMe())
+	router.GET("/auth/sessions", auth.GetMySessions())
+	router.DELETE("/auth/sessions/:id", auth.TerminateMySession())
 
 	// User preferences
 	router.GET("/user/theme", user.GetTheme())

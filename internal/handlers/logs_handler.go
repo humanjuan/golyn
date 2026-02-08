@@ -12,12 +12,27 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/humanjuan/golyn/internal/security/hierarchy"
 )
 
 func GetLogs() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := globals.GetAppLogger()
 		log.Debug("GetLogs()")
+
+		// Role-based filtering
+		role, _ := c.Get("role")
+		actorRole := strings.ToLower(fmt.Sprintf("%v", role))
+		userSiteID, _ := c.Get("site_id")
+		managedSitesVal, _ := c.Get("managed_sites")
+		managedSites, _ := managedSitesVal.([]string)
+
+		domainsToFilter := []string{strings.ToLower(fmt.Sprintf("%v", userSiteID))}
+		for _, ms := range managedSites {
+			domainsToFilter = append(domainsToFilter, strings.ToLower(ms))
+		}
+
 		config := globals.GetConfig()
 		var logFilePath string
 		var typeLog string
@@ -102,8 +117,28 @@ func GetLogs() gin.HandlerFunc {
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			line := scanner.Text()
+
+			// Apply multi-tenant filtering for Admins
+			if actorRole == hierarchy.RoleAdmin {
+				found := false
+				lineLower := strings.ToLower(line)
+				for _, domain := range domainsToFilter {
+					if strings.Contains(lineLower, domain) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					continue
+				}
+			}
+
 			logTime, err := utils.ParseLogTimestamp(line)
-			if err != nil || now.Sub(logTime) > customLogTime {
+			if err != nil {
+				log.Debug("Could not parse log line: %v", err)
+				continue
+			}
+			if now.Sub(logTime) > customLogTime {
 				continue
 			}
 			fileLines = append(fileLines, line)

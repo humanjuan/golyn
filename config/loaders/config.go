@@ -32,6 +32,7 @@ type Security struct {
 	AllowOrigin           []string
 	ContentSecurityPolicy string
 	PermissionsPolicy     string
+	AutoJWT               bool
 	TLS_SSL               TLS_SSL
 }
 type SiteConfig struct {
@@ -76,9 +77,11 @@ type Server struct {
 	CookieSameSite             string
 	CookieHttpOnly             bool
 	CookieSecure               bool
+	CookieDomain               string
 	GlobalWhitelist            []string
 	ParsedWhitelistNetworks    []*net.IPNet
 	ExcludedPaths              []string
+	MainDomain                 string
 }
 
 type Cache struct {
@@ -99,7 +102,7 @@ type OAuthProvider struct {
 	ClientID     string
 	ClientSecret string
 	RedirectURL  string
-	TenantID     string // Specific for Azure
+	TenantID     string // Specific for Microsoft Entra ID
 }
 
 type OAuth2 struct {
@@ -190,6 +193,7 @@ func LoadConfig() (*Config, error) {
 	server.CookieSameSite = serverSection.Key("cookieSameSite").MustString("Lax")
 	server.CookieHttpOnly = serverSection.Key("cookieHttpOnly").MustBool(true)
 	server.CookieSecure = serverSection.Key("cookieSecure").MustBool(true)
+	server.CookieDomain = serverSection.Key("cookieDomain").String()
 	server.GlobalWhitelist = serverSection.Key("globalWhitelist").Strings(",")
 	for _, entry := range server.GlobalWhitelist {
 		entry = strings.TrimSpace(entry)
@@ -198,6 +202,7 @@ func LoadConfig() (*Config, error) {
 		}
 	}
 	server.ExcludedPaths = serverSection.Key("excludedPaths").Strings(",")
+	server.MainDomain = serverSection.Key("mainDomain").MustString("humanjuan.com")
 
 	if !filepath.IsAbs(server.SitesRootPath) {
 		server.SitesRootPath = filepath.Join(basePath, server.SitesRootPath)
@@ -445,6 +450,7 @@ func LoadSiteConfig(name string, path string, basePath string, server Server) (S
 	security.AllowOrigin = siteSettings.Key("allowOrigin").Strings(",")
 	security.ContentSecurityPolicy = strings.Trim(siteSettings.Key("contentSecurityPolicy").String(), "\"")
 	security.PermissionsPolicy = strings.Trim(siteSettings.Key("permissionsPolicy").String(), "\"")
+	security.AutoJWT, _, _ = CheckBool(siteSettings.Key("autoJWT"), false, sectionName, "autoJWT")
 	siteConfig.Security = security
 
 	// SMTP

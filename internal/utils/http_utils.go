@@ -1,6 +1,9 @@
 package utils
 
-import "net/http"
+import (
+	"net/http"
+	"net/url"
+)
 
 var httpCodeMessages = map[int]string{
 	http.StatusContinue:            "[Continue] Server received the request and the client may continue sending the body.",
@@ -31,6 +34,10 @@ type APIResponse struct {
 	Message string      `json:"message,omitempty"`
 	Data    interface{} `json:"data,omitempty"`
 	Error   string      `json:"error,omitempty"`
+}
+
+func URLEncode(s string) string {
+	return url.QueryEscape(s)
 }
 
 func GetCodeMessage(code int) string {

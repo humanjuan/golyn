@@ -34,8 +34,7 @@ import (
 // Documentation: https://gin-gonic.com/docs/quickstart/
 
 const (
-	version    string = "v1.5.0"
-	mainDomain string = "humanjuan.com"
+	version string = "v1.6.0"
 )
 
 func main() {
@@ -189,7 +188,7 @@ func main() {
 	serverRouter.Use(middlewares.CompressionMiddleware())
 	serverRouter.Use(virtualhosts.CreateDynamicProxyHandler(proxyMap))
 
-	routes.ConfigureRoutes(serverRouter, serverInfo, mainDomain, conf.Server.Dev)
+	routes.ConfigureRoutes(serverRouter, serverInfo, conf.Server.MainDomain, conf.Server.Dev)
 
 	// Lifecycle Start
 	lifecycle.NotifyRouterReady(serverRouter)

@@ -99,3 +99,32 @@ func GrantMiddleware(requiredGrant string) gin.HandlerFunc {
 		c.Abort()
 	}
 }
+
+// RestrictAdminHostMiddleware ensures that admin routes are only accessible from the main domain
+func RestrictAdminHostMiddleware(mainDomain string, dev bool) gin.HandlerFunc {
+	log := globals.GetAppLogger()
+	return func(c *gin.Context) {
+		hostParts := strings.Split(c.Request.Host, ":")
+		host := strings.ToLower(hostParts[0])
+		lowerMainDomain := strings.ToLower(mainDomain)
+
+		// Allow exact match or any subdomain of mainDomain (e.g., golyn.humanjuan.com)
+		isAllowed := host == lowerMainDomain || strings.HasSuffix(host, "."+lowerMainDomain)
+
+		if dev && !isAllowed {
+			// In dev mode, also allow .local versions
+			if strings.HasSuffix(host, ".local") {
+				isAllowed = true
+			}
+		}
+
+		if !isAllowed {
+			log.Warn("RestrictAdminHostMiddleware() | Admin access denied for host: %s | Main Domain: %s", host, mainDomain)
+			c.Error(utils.NewHTTPError(http.StatusForbidden, "administration endpoints are only accessible from the main domain or its subdomains"))
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
