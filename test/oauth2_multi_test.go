@@ -4,7 +4,7 @@ Package test provides integration and regression tests for the Golyn project.
 oauth2_multi_test.go: Multi-Provider OAuth2 Integration Test
 
 This test validates the OAuth2 authentication flow across multiple identity
-providers (Azure AD, Google, GitHub). It ensures that the redirection,
+providers (Microsoft Entra ID, Google, GitHub). It ensures that the redirection,
 state management, and provider-specific configurations work correctly.
 
 1. Setup:
@@ -139,7 +139,7 @@ func TestOAuth2MultiProvider(t *testing.T) {
 	}
 
 	t.Run("Login Redirection and State Cookie", func(t *testing.T) {
-		providers := []string{"azure", "google", "github"}
+		providers := []string{"azure", "google", "github", "facebook"}
 		for _, p := range providers {
 			req, _ := http.NewRequest("GET", "/api/v1/auth/"+p+"/login?next=http://myapp.local/dashboard", nil)
 			req.Host = host
@@ -216,6 +216,25 @@ func TestOAuth2MultiProvider(t *testing.T) {
 		}
 		if count == 0 {
 			t.Error("Auth event was not found in database")
+		}
+	})
+
+	t.Run("Callback Redirection without next cookie", func(t *testing.T) {
+		// Mock a request without the required state cookie
+		req, _ := http.NewRequest("GET", "/api/v1/auth/google/callback?state=xyz&code=abc", nil)
+		req.Host = host
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// It should redirect to the login error page because CSRF state is missing,
+		// but the important thing is that it REDIRECTS, not returns JSON.
+		if w.Code != http.StatusTemporaryRedirect {
+			t.Errorf("Expected redirect on error, got %d", w.Code)
+		}
+
+		location := w.Header().Get("Location")
+		if !strings.Contains(location, "/login?error=") {
+			t.Errorf("Expected redirect to login error page, got %s", location)
 		}
 	})
 }
