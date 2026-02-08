@@ -13,7 +13,8 @@ type UserDTO struct {
 	Username    string      `json:"username"`
 	Role        string      `json:"role"`
 	Status      string      `json:"status"`
-	SiteID      string      `json:"site_id"`
+	SiteID      *string     `json:"site_id"`
+	SiteKey     *string     `json:"site_key,omitempty"`
 	Theme       interface{} `json:"theme,omitempty"`
 	Permissions interface{} `json:"permissions,omitempty"`
 	CreatedAt   *time.Time  `json:"created_at,omitempty"`
@@ -45,6 +46,7 @@ func MapUserToDTO(u database.User) UserDTO {
 		Role:        u.Role,
 		Status:      u.Status,
 		SiteID:      u.SiteID,
+		SiteKey:     u.SiteKey,
 		Theme:       theme,
 		Permissions: permissions,
 		CreatedAt:   u.CreatedAt,
