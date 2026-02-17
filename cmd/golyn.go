@@ -34,7 +34,7 @@ import (
 // Documentation: https://gin-gonic.com/docs/quickstart/
 
 const (
-	version string = "v1.6.0"
+	version string = "v1.6.1"
 )
 
 func main() {
@@ -99,8 +99,8 @@ func main() {
 		logApp.Sync()
 	}
 
-	logApp.Info("main() | Dev mode: %t | Server: %s | Port: %d | Local IP: %s | Public IP: %s",
-		conf.Server.Dev, conf.Server.Name, conf.Server.Port, localIP, publicIP)
+	logApp.Info("main() | Dev mode: %t | Server: %s | HTTP Port: %d | TLS Port: %d | Local IP: %s | Public IP: %s",
+		conf.Server.Dev, conf.Server.Name, conf.Server.HTTPPort, conf.Server.TLSPort, localIP, publicIP)
 
 	// Run mode
 	if conf.Server.Dev {
@@ -205,7 +205,7 @@ func main() {
 	if err != nil {
 		logApp.Warn("main() | No valid certificates found, HTTPS will handle errors. Falling back to HTTP for some sites. | Error: %v", err.Error())
 	}
-	logApp.Info("main() | TLS server on port %d", conf.Server.Port)
+	logApp.Info("main() | TLS server on port %d", conf.Server.TLSPort)
 
 	// Redirect server
 	serverHTTP, err := internal.SetupServerHTTP(serverRouter)
@@ -215,7 +215,7 @@ func main() {
 		panic(err.Error())
 	}
 	if serverHTTP != nil {
-		logApp.Info("main() | HTTP redirect server on port 80")
+		logApp.Info("main() | HTTP server on port %d", conf.Server.HTTPPort)
 	} else {
 		logApp.Info("main() | HTTP server is disabled (Production mode).")
 	}

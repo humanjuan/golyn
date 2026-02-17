@@ -65,7 +65,7 @@ func SetupServerHTTPS(router http.Handler) (*http.Server, error) {
 	}
 
 	server := &http.Server{
-		Addr:           "0.0.0.0:" + strconv.Itoa(config.Server.Port),
+		Addr:           "0.0.0.0:" + strconv.Itoa(config.Server.TLSPort),
 		Handler:        router,
 		ReadTimeout:    time.Duration(config.Server.ReadTimeoutSecond) * time.Second,
 		WriteTimeout:   time.Duration(config.Server.WriteTimeoutSecond) * time.Second,
@@ -95,9 +95,9 @@ func SetupServerHTTP(router http.Handler) (*http.Server, error) {
 
 	log.Debug("SetupServerHTTP() | Starting HTTP server (Development mode).")
 
-	// HTTP server for port 80
+	// HTTP server for configured port
 	serverHTTP := &http.Server{
-		Addr:    "0.0.0.0:80",
+		Addr:    "0.0.0.0:" + strconv.Itoa(config.Server.HTTPPort),
 		Handler: router,
 	}
 	return serverHTTP, nil

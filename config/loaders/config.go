@@ -62,7 +62,6 @@ type Server struct {
 	Dev                        bool
 	Name                       string
 	SitesRootPath              string
-	Port                       int
 	ReadTimeoutSecond          int
 	WriteTimeoutSecond         int
 	MaxHeaderMB                int
@@ -82,6 +81,8 @@ type Server struct {
 	ParsedWhitelistNetworks    []*net.IPNet
 	ExcludedPaths              []string
 	MainDomain                 string
+	HTTPPort                   int
+	TLSPort                    int
 }
 
 type Cache struct {
@@ -173,7 +174,22 @@ func LoadConfig() (*Config, error) {
 	server.Dev, _ = serverSection.Key("dev").Bool()
 	server.Name = serverSection.Key("name").String()
 	server.SitesRootPath = serverSection.Key("sitesRootPath").String()
-	server.Port, _ = serverSection.Key("port").Int()
+	server.HTTPPort, _ = serverSection.Key("httpPort").Int()
+	server.TLSPort, _ = serverSection.Key("tlsPort").Int()
+
+	// Default values if not specified
+	if server.TLSPort == 0 {
+		// Fallback to legacy 'port' key if tlsPort is not set
+		server.TLSPort, _ = serverSection.Key("port").Int()
+	}
+
+	if server.HTTPPort == 0 {
+		server.HTTPPort = 80
+	}
+	if server.TLSPort == 0 {
+		server.TLSPort = 443
+	}
+
 	server.ReadTimeoutSecond, _ = serverSection.Key("readTimeoutSecond").Int()
 	server.WriteTimeoutSecond, _ = serverSection.Key("writeTimeoutSecond").Int()
 	server.MaxHeaderMB, _ = serverSection.Key("maxHeaderMB").Int()
