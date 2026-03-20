@@ -30,7 +30,8 @@ func Setup(router *gin.Engine) map[string][]app.VirtualHost {
 
 		// if proxy = true, apply reverse proxy
 		if siteConfig.Proxy {
-			log.Info("Setup() | Site '%s' is configured as reverse proxy for: %v", siteConfig.Directory, siteConfig.Domains)
+			log.Info("Setup() | Site '%s' is configured as reverse proxy for: %v with prefix: %s",
+				siteConfig.Directory, siteConfig.Domains, siteConfig.PathPrefix)
 		}
 
 		// Determine the base path for this site
@@ -121,24 +122,44 @@ func BuildProxyHostMap(sites []loaders.SiteConfig) map[string]string {
 	return proxyMap
 }
 
-func CreateDynamicProxyHandler(proxyMap map[string]string) gin.HandlerFunc {
+func CreateDynamicProxyHandler() gin.HandlerFunc {
 	log := globals.GetAppLogger()
 	log.Debug("CreateDynamicProxyHandler()")
 	return func(c *gin.Context) {
 		hostParts := strings.Split(c.Request.Host, ":")
 		host := hostParts[0]
 
-		target, exists := proxyMap[host]
-		log.Debug("CreateDynamicProxyHandler() | ProxyCheck | Host: %s | Path: %s | Exists: %v | Target: %s", host, c.Request.URL.Path, exists, target)
-
-		if exists {
-			log.Info("CreateDynamicProxyHandler() | Applying reverse proxy to %s", target)
-			middleware := middlewares.ReverseProxyMiddleware(target)
-			middleware(c)
+		vhs, exists := globals.VirtualHosts[host]
+		if !exists {
+			log.Debug("CreateDynamicProxyHandler() | Host not found in VirtualHosts: %s", host)
+			c.Next()
 			return
 		}
 
-		log.Debug("CreateDynamicProxyHandler() | Host not found in proxyMap: %s", host)
+		path := c.Request.URL.Path
+		for _, vh := range vhs {
+			if vh.Proxy && (vh.PathPrefix == "/" || strings.HasPrefix(path, vh.PathPrefix)) {
+				log.Info("CreateDynamicProxyHandler() | Applying reverse proxy to %s", vh.ProxyTarget)
+
+				// Strip prefix if it's not root
+				if vh.PathPrefix != "/" {
+					c.Request.URL.Path = strings.TrimPrefix(path, vh.PathPrefix)
+					if !strings.HasPrefix(c.Request.URL.Path, "/") {
+						c.Request.URL.Path = "/" + c.Request.URL.Path
+					}
+				}
+
+				interval := time.Duration(vh.ProxyFlushInterval) * time.Millisecond
+				if vh.ProxyFlushInterval == -1 {
+					interval = -1
+				}
+
+				middleware := middlewares.ReverseProxyMiddleware(vh.ProxyTarget, interval)
+				middleware(c)
+				return
+			}
+		}
+
 		c.Next()
 	}
 }
