@@ -3,6 +3,7 @@ package middlewares
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/humanjuan/golyn/app"
 	"github.com/humanjuan/golyn/globals"
 	"github.com/humanjuan/golyn/internal/utils"
 	"github.com/patrickmn/go-cache"
@@ -57,12 +58,25 @@ func FileExistsCached(c *gin.Context, site string, relativePath string, encoding
 
 	virtualHosts := globals.VirtualHosts
 	host := strings.Split(c.Request.Host, ":")[0]
-	virtualHost, ok := virtualHosts[host]
+	path := c.Request.URL.Path
+	vhs, ok := virtualHosts[host]
 	if !ok {
 		return false
 	}
 
-	fullPath := filepath.Join(virtualHost.BasePath, relativePath)
+	var vh *app.VirtualHost
+	for i := range vhs {
+		if vhs[i].PathPrefix == "/" || strings.HasPrefix(path, vhs[i].PathPrefix) {
+			vh = &vhs[i]
+			break
+		}
+	}
+
+	if vh == nil {
+		return false
+	}
+
+	fullPath := filepath.Join(vh.BasePath, relativePath)
 
 	if encoding == "br" {
 		fullPath += ".br"

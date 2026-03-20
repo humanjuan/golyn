@@ -5,13 +5,14 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/humanjuan/golyn/globals"
 	"github.com/humanjuan/golyn/internal/utils"
 )
 
-func ReverseProxyMiddleware(target string) gin.HandlerFunc {
+func ReverseProxyMiddleware(target string, flushInterval time.Duration) gin.HandlerFunc {
 	log := globals.GetAppLogger()
 	log.Debug("ReverseProxyMiddleware()")
 	return func(c *gin.Context) {
@@ -25,6 +26,7 @@ func ReverseProxyMiddleware(target string) gin.HandlerFunc {
 		}
 
 		proxy := httputil.NewSingleHostReverseProxy(proxyURL)
+		proxy.FlushInterval = flushInterval
 		originalDirector := proxy.Director
 		proxy.Director = func(req *http.Request) {
 			originalDirector(req)

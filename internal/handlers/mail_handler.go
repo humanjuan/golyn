@@ -36,8 +36,14 @@ func SendmailHandler() gin.HandlerFunc {
 
 		if smtp.Host == "" {
 			// Fallback to VirtualHosts
-			if site, ok := globals.VirtualHosts[host]; ok {
-				smtp = site.SMTP
+			if vhs, ok := globals.VirtualHosts[host]; ok {
+				path := c.Request.URL.Path
+				for i := range vhs {
+					if vhs[i].PathPrefix == "/" || strings.HasPrefix(path, vhs[i].PathPrefix) {
+						smtp = vhs[i].SMTP
+						break
+					}
+				}
 			}
 		}
 

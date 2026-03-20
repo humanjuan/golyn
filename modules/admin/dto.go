@@ -96,7 +96,8 @@ func MapSiteConfigToDTO(s loaders.SiteConfig) SiteConfigDTO {
 // ServerConfigDTO represents global server configuration for SuperAdmin
 type ServerConfigDTO struct {
 	MainDomain                 string   `json:"main_domain"`
-	Port                       int      `json:"port"`
+	HTTPPort                   int      `json:"http_port"`
+	TLSPort                    int      `json:"tls_port"`
 	DevMode                    bool     `json:"dev_mode"`
 	TokenExpirationTime        int      `json:"token_expiration_time"`
 	TokenExpirationRefreshTime int      `json:"token_expiration_refresh_time"`
@@ -218,7 +219,8 @@ func MapAuthProviderToDTO(p database.AuthProvider) AuthProviderDTO {
 func MapServerConfigToDTO(c *loaders.Config) ServerConfigDTO {
 	return ServerConfigDTO{
 		MainDomain:                 c.Server.MainDomain,
-		Port:                       c.Server.Port,
+		HTTPPort:                   c.Server.HTTPPort,
+		TLSPort:                    c.Server.TLSPort,
 		DevMode:                    c.Server.Dev,
 		TokenExpirationTime:        c.Server.TokenExpirationTime,
 		TokenExpirationRefreshTime: c.Server.TokenExpirationRefreshTime,

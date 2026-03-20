@@ -11,12 +11,12 @@ import (
 	"path/filepath"
 )
 
-func CreateRouteHandler(basePath, fileType string) gin.HandlerFunc {
+func CreateRouteHandler(basePath string) gin.HandlerFunc {
 	log := globals.GetAppLogger()
-	log.Debug("CreateRouteHandler() | Creating route handler for %s", fileType)
+	log.Debug("CreateRouteHandler() | Creating route handler for %s", basePath)
 	return func(c *gin.Context) {
 		requestedFile := c.Param("filepath")
-		fullPath := filepath.Join(basePath, fileType, requestedFile)
+		fullPath := filepath.Join(basePath, requestedFile)
 
 		contentType, ok := utils.GetAllowedMime(fullPath)
 		if !ok {

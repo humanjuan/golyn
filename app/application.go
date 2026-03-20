@@ -25,13 +25,15 @@ type Cert struct {
 }
 
 type VirtualHost struct {
-	HostName    string
-	SiteName    string
-	ConfigPath  string
-	BasePath    string
-	SiteGroup   *gin.RouterGroup
-	Proxy       bool
-	ProxyTarget string
-	Security    loaders.Security
-	SMTP        loaders.SMTP
+	HostName           string
+	SiteName           string
+	ConfigPath         string
+	BasePath           string
+	SiteGroup          *gin.RouterGroup
+	Proxy              bool
+	ProxyTarget        string
+	ProxyFlushInterval int
+	PathPrefix         string
+	Security           loaders.Security
+	SMTP               loaders.SMTP
 }

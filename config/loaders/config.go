@@ -36,15 +36,17 @@ type Security struct {
 	TLS_SSL               TLS_SSL
 }
 type SiteConfig struct {
-	Enabled     bool
-	Path        string
-	Directory   string
-	Domains     []string
-	Proxy       bool
-	ProxyTarget string
-	StaticFiles StaticFiles
-	Security    Security
-	SMTP        SMTP
+	Enabled            bool
+	Path               string
+	Directory          string
+	Domains            []string
+	Proxy              bool
+	ProxyTarget        string
+	ProxyFlushInterval int
+	PathPrefix         string
+	StaticFiles        StaticFiles
+	Security           Security
+	SMTP               SMTP
 }
 
 type Database struct {
@@ -62,7 +64,6 @@ type Server struct {
 	Dev                        bool
 	Name                       string
 	SitesRootPath              string
-	Port                       int
 	ReadTimeoutSecond          int
 	WriteTimeoutSecond         int
 	MaxHeaderMB                int
@@ -82,6 +83,8 @@ type Server struct {
 	ParsedWhitelistNetworks    []*net.IPNet
 	ExcludedPaths              []string
 	MainDomain                 string
+	HTTPPort                   int
+	TLSPort                    int
 }
 
 type Cache struct {
@@ -173,7 +176,22 @@ func LoadConfig() (*Config, error) {
 	server.Dev, _ = serverSection.Key("dev").Bool()
 	server.Name = serverSection.Key("name").String()
 	server.SitesRootPath = serverSection.Key("sitesRootPath").String()
-	server.Port, _ = serverSection.Key("port").Int()
+	server.HTTPPort, _ = serverSection.Key("httpPort").Int()
+	server.TLSPort, _ = serverSection.Key("tlsPort").Int()
+
+	// Default values if not specified
+	if server.TLSPort == 0 {
+		// Fallback to legacy 'port' key if tlsPort is not set
+		server.TLSPort, _ = serverSection.Key("port").Int()
+	}
+
+	if server.HTTPPort == 0 {
+		server.HTTPPort = 80
+	}
+	if server.TLSPort == 0 {
+		server.TLSPort = 443
+	}
+
 	server.ReadTimeoutSecond, _ = serverSection.Key("readTimeoutSecond").Int()
 	server.WriteTimeoutSecond, _ = serverSection.Key("writeTimeoutSecond").Int()
 	server.MaxHeaderMB, _ = serverSection.Key("maxHeaderMB").Int()
@@ -359,11 +377,9 @@ func LoadSiteConfig(name string, path string, basePath string, server Server) (S
 		return siteConfig, nil
 	}
 
-	siteConfig.Directory, ok, err = CheckString(siteSettings.Key("directory"), true, sectionName, "directory")
-	if !ok {
-		siteConfig.Enabled = false
-		fmt.Printf("[ERROR] The site %s was deactivated due to incorrect configuration.\n", name)
-		return siteConfig, fmt.Errorf("error loading the site configuration '%s': %v", name, err)
+	siteConfig.PathPrefix = siteSettings.Key("pathPrefix").MustString("/")
+	if !strings.HasPrefix(siteConfig.PathPrefix, "/") {
+		siteConfig.PathPrefix = "/" + siteConfig.PathPrefix
 	}
 
 	siteConfig.Domains = siteSettings.Key("domains").Strings(",")
@@ -375,6 +391,8 @@ func LoadSiteConfig(name string, path string, basePath string, server Server) (S
 		siteConfig.ProxyTarget = ""
 	}
 
+	siteConfig.ProxyFlushInterval = siteSettings.Key("proxyFlushInterval").MustInt(0)
+
 	if siteConfig.Proxy {
 		siteConfig.ProxyTarget, ok, err = CheckString(siteSettings.Key("proxyTarget"), true, sectionName, "proxyTarget")
 		if !ok {
@@ -384,6 +402,12 @@ func LoadSiteConfig(name string, path string, basePath string, server Server) (S
 		}
 		fmt.Printf("[INFO] Skipping static files for site '%s' because it is a proxy\n", name)
 	} else {
+		siteConfig.Directory, ok, err = CheckString(siteSettings.Key("directory"), true, sectionName, "directory")
+		if !ok {
+			siteConfig.Enabled = false
+			fmt.Printf("[ERROR] The site %s was deactivated due to incorrect configuration.\n", name)
+			return siteConfig, fmt.Errorf("error loading the site configuration '%s': %v", name, err)
+		}
 		// STATIC FILES
 		staticFiles.Assets, ok, err = CheckString(siteSettings.Key("staticFilesPath"), true, sectionName, "staticFilesPath")
 		if !ok {

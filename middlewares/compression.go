@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/humanjuan/golyn/app"
 	"github.com/humanjuan/golyn/globals"
 	"github.com/humanjuan/golyn/internal/utils"
 )
@@ -31,8 +32,28 @@ func CompressionMiddleware() gin.HandlerFunc {
 		}
 		virtualHosts := globals.VirtualHosts
 		host := strings.Split(c.Request.Host, ":")[0]
-		virtualHost, ok := virtualHosts[host]
+
+		if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
+			c.Next()
+			return
+		}
+
+		requestPath := c.Request.URL.Path
+		vhs, ok := virtualHosts[host]
 		if !ok {
+			c.Next()
+			return
+		}
+
+		var vh *app.VirtualHost
+		for i := range vhs {
+			if vhs[i].PathPrefix == "/" || strings.HasPrefix(requestPath, vhs[i].PathPrefix) {
+				vh = &vhs[i]
+				break
+			}
+		}
+
+		if vh == nil {
 			c.Next()
 			return
 		}
@@ -42,13 +63,14 @@ func CompressionMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		requestPath := c.Request.URL.Path
 		cleanPath := strings.TrimPrefix(requestPath, "/")
 
 		// Relative Path calculation
-		siteName := filepath.Base(virtualHost.BasePath)
+		siteName := filepath.Base(vh.BasePath)
 		var relativePath string
-		if strings.HasPrefix(cleanPath, siteName+"/") || cleanPath == siteName {
+		if vh.PathPrefix != "/" {
+			relativePath = strings.TrimPrefix(requestPath, vh.PathPrefix)
+		} else if strings.HasPrefix(cleanPath, siteName+"/") || cleanPath == siteName {
 			relativePath = strings.TrimPrefix(cleanPath, siteName)
 		} else {
 			relativePath = cleanPath
@@ -73,7 +95,7 @@ func CompressionMiddleware() gin.HandlerFunc {
 		for _, compression := range CompressionTypes {
 			if compression.Name != "" && strings.Contains(acceptEncoding, compression.Name) {
 				if FileExistsCached(c, siteName, relativePath, compression.Name) {
-					fullPath := filepath.Join(virtualHost.BasePath, relativePath) + compression.Extension
+					fullPath := filepath.Join(vh.BasePath, relativePath) + compression.Extension
 					if utils.FileOrDirectoryExists(fullPath) {
 						// Set headers and serve compressed file
 						c.Writer.Header().Set("Content-Type", contentType)
@@ -88,7 +110,7 @@ func CompressionMiddleware() gin.HandlerFunc {
 
 		// Normal file
 		if FileExistsCached(c, siteName, relativePath, "normal") {
-			fullPath := filepath.Join(virtualHost.BasePath, relativePath)
+			fullPath := filepath.Join(vh.BasePath, relativePath)
 			if utils.FileOrDirectoryExists(fullPath) {
 				contentType := utils.GetMimeTypeFromCompressedFilePath(relativePath)
 				c.Writer.Header().Set("Content-Type", contentType)

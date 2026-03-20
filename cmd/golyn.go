@@ -34,7 +34,7 @@ import (
 // Documentation: https://gin-gonic.com/docs/quickstart/
 
 const (
-	version string = "v1.6.0"
+	version string = "v1.7.0"
 )
 
 func main() {
@@ -99,8 +99,8 @@ func main() {
 		logApp.Sync()
 	}
 
-	logApp.Info("main() | Dev mode: %t | Server: %s | Port: %d | Local IP: %s | Public IP: %s",
-		conf.Server.Dev, conf.Server.Name, conf.Server.Port, localIP, publicIP)
+	logApp.Info("main() | Dev mode: %t | Server: %s | HTTP Port: %d | TLS Port: %d | Local IP: %s | Public IP: %s",
+		conf.Server.Dev, conf.Server.Name, conf.Server.HTTPPort, conf.Server.TLSPort, localIP, publicIP)
 
 	// Run mode
 	if conf.Server.Dev {
@@ -154,7 +154,6 @@ func main() {
 
 	// Set up virtual hosts
 	globals.VirtualHosts = virtualhosts.Setup(serverRouter)
-	proxyMap := virtualhosts.BuildProxyHostMap(conf.Sites)
 
 	// Error templates
 	err = handlers.LoadErrorTemplate(globals.DefaultSite)
@@ -178,6 +177,7 @@ func main() {
 	serverRouter.Use(middlewares.LoggingMiddleware())
 	serverRouter.Use(middlewares.CustomErrorHandler())
 
+	serverRouter.Use(virtualhosts.CreateDynamicProxyHandler())
 	// Platform security headers + HTTPS enforcement + per-site dynamic config reload (hash-based)
 	siteProvider := internalcfg.NewSiteProvider()
 	serverRouter.Use(middlewares.SecurityHeadersMiddleware(siteProvider, conf.Server.Dev))
@@ -186,7 +186,6 @@ func main() {
 	serverRouter.Use(middlewares.ClientCacheMiddleware(conf.Server.Dev))
 
 	serverRouter.Use(middlewares.CompressionMiddleware())
-	serverRouter.Use(virtualhosts.CreateDynamicProxyHandler(proxyMap))
 
 	routes.ConfigureRoutes(serverRouter, serverInfo, conf.Server.MainDomain, conf.Server.Dev)
 
@@ -205,7 +204,7 @@ func main() {
 	if err != nil {
 		logApp.Warn("main() | No valid certificates found, HTTPS will handle errors. Falling back to HTTP for some sites. | Error: %v", err.Error())
 	}
-	logApp.Info("main() | TLS server on port %d", conf.Server.Port)
+	logApp.Info("main() | TLS server on port %d", conf.Server.TLSPort)
 
 	// Redirect server
 	serverHTTP, err := internal.SetupServerHTTP(serverRouter)
@@ -215,7 +214,7 @@ func main() {
 		panic(err.Error())
 	}
 	if serverHTTP != nil {
-		logApp.Info("main() | HTTP redirect server on port 80")
+		logApp.Info("main() | HTTP server on port %d", conf.Server.HTTPPort)
 	} else {
 		logApp.Info("main() | HTTP server is disabled (Production mode).")
 	}
