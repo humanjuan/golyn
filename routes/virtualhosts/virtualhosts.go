@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/humanjuan/golyn/app"
-	"github.com/humanjuan/golyn/config/loaders"
 	"github.com/humanjuan/golyn/globals"
 	"github.com/humanjuan/golyn/middlewares"
 	"github.com/humanjuan/golyn/routes"
@@ -105,21 +104,6 @@ func Setup(router *gin.Engine) map[string][]app.VirtualHost {
 
 	log.Info("Setup() | Default Site Path: %s", globals.DefaultSite)
 	return virtualHosts
-}
-
-func BuildProxyHostMap(sites []loaders.SiteConfig) map[string]string {
-	log := globals.GetAppLogger()
-	log.Debug("BuildProxyHostMap()")
-	proxyMap := make(map[string]string)
-
-	for _, site := range sites {
-		if site.Proxy {
-			for _, domain := range site.Domains {
-				proxyMap[domain] = site.ProxyTarget
-			}
-		}
-	}
-	return proxyMap
 }
 
 func CreateDynamicProxyHandler() gin.HandlerFunc {

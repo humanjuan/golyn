@@ -154,7 +154,6 @@ func main() {
 
 	// Set up virtual hosts
 	globals.VirtualHosts = virtualhosts.Setup(serverRouter)
-	proxyMap := virtualhosts.BuildProxyHostMap(conf.Sites)
 
 	// Error templates
 	err = handlers.LoadErrorTemplate(globals.DefaultSite)
@@ -178,6 +177,7 @@ func main() {
 	serverRouter.Use(middlewares.LoggingMiddleware())
 	serverRouter.Use(middlewares.CustomErrorHandler())
 
+	serverRouter.Use(virtualhosts.CreateDynamicProxyHandler())
 	// Platform security headers + HTTPS enforcement + per-site dynamic config reload (hash-based)
 	siteProvider := internalcfg.NewSiteProvider()
 	serverRouter.Use(middlewares.SecurityHeadersMiddleware(siteProvider, conf.Server.Dev))
@@ -186,7 +186,6 @@ func main() {
 	serverRouter.Use(middlewares.ClientCacheMiddleware(conf.Server.Dev))
 
 	serverRouter.Use(middlewares.CompressionMiddleware())
-	serverRouter.Use(virtualhosts.CreateDynamicProxyHandler(proxyMap))
 
 	routes.ConfigureRoutes(serverRouter, serverInfo, conf.Server.MainDomain, conf.Server.Dev)
 
