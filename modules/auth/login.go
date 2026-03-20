@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/humanjuan/golyn/app"
 	"github.com/humanjuan/golyn/config/loaders"
 	"github.com/humanjuan/golyn/database"
 	"github.com/humanjuan/golyn/globals"
@@ -107,21 +108,41 @@ func Login() gin.HandlerFunc {
 		log.Info("ClientIP: %s | User: %s | Login: Success | Attempts: %v | Sleep: 0s | Cache Items: %d",
 			c.ClientIP(), effectiveUsername, attempts, _cache.ItemCount())
 
-		siteID := c.Request.Host
+		hostParts := strings.Split(c.Request.Host, ":")
+		host := strings.ToLower(hostParts[0])
+
 		ip := c.ClientIP()
 		userAgent := c.Request.UserAgent()
+		path := c.Request.URL.Path
 
 		// Multi-tenant Isolation Check
 		if !user[0].IsGlobal {
 			var currentSiteID string
 			var siteResults []database.Site
-			err = db.Select("SELECT id FROM core.sites WHERE lower(host) = lower($1)", &siteResults, siteID)
+
+			// Find site by Host and PathPrefix
+			var vh *app.VirtualHost
+			if vhs, ok := globals.VirtualHosts[host]; ok {
+				for i := range vhs {
+					if vhs[i].PathPrefix == "/" || strings.HasPrefix(path, vhs[i].PathPrefix) {
+						vh = &vhs[i]
+						break
+					}
+				}
+			}
+
+			if vh != nil && vh.PathPrefix != "/" {
+				// En entornos multi-path, el "Host" para la DB podría estar guardado con o sin puerto
+				// Pero aquí buscamos por host exacto en la tabla core.sites
+			}
+
+			err = db.Select("SELECT id FROM core.sites WHERE lower(host) = lower($1)", &siteResults, host)
 			if err == nil && len(siteResults) > 0 {
 				currentSiteID = siteResults[0].Id
 			}
 
 			if currentSiteID == "" {
-				log.Warn("Login() | Site not found: %s", siteID)
+				log.Warn("Login() | Site not found: %s", host)
 				c.Error(utils.NewHTTPError(http.StatusForbidden, "site not registered in Golyn"))
 				c.Abort()
 				return
@@ -131,7 +152,7 @@ func Login() gin.HandlerFunc {
 			if user[0].SiteID == nil || *user[0].SiteID != currentSiteID {
 				allowed, err := db.IsSiteAllowedForUser(user[0].Id, currentSiteID)
 				if err != nil || !allowed {
-					log.Warn("Login() | Access Denied (Isolation) | User: %s | Host: %s", effectiveUsername, siteID)
+					log.Warn("Login() | Access Denied (Isolation) | User: %s | Host: %s", effectiveUsername, host)
 					c.Error(utils.NewHTTPError(http.StatusForbidden, "access denied for this site"))
 					c.Abort()
 					return
@@ -139,7 +160,7 @@ func Login() gin.HandlerFunc {
 			}
 		}
 
-		accessToken, refreshToken, err := CreateToken(effectiveUsername, siteID, ip, userAgent)
+		accessToken, refreshToken, err := CreateToken(effectiveUsername, host, ip, userAgent)
 		if err != nil {
 			log.Error("Login() | An error has occurred in the server when trying to get access tokens. Try again later: %s", err.Error())
 			err = fmt.Errorf("an error has occurred in the server when trying to get access tokens")
@@ -152,7 +173,7 @@ func Login() gin.HandlerFunc {
 
 		var siteUUID *string
 		var siteResults []database.Site
-		err = db.Select("SELECT id FROM core.sites WHERE lower(host) = lower($1)", &siteResults, siteID)
+		err = db.Select("SELECT id FROM core.sites WHERE lower(host) = lower($1)", &siteResults, host)
 		if err == nil && len(siteResults) > 0 {
 			siteUUID = &siteResults[0].Id
 		}
