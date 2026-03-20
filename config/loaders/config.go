@@ -377,11 +377,9 @@ func LoadSiteConfig(name string, path string, basePath string, server Server) (S
 		return siteConfig, nil
 	}
 
-	siteConfig.Directory, ok, err = CheckString(siteSettings.Key("directory"), true, sectionName, "directory")
-	if !ok {
-		siteConfig.Enabled = false
-		fmt.Printf("[ERROR] The site %s was deactivated due to incorrect configuration.\n", name)
-		return siteConfig, fmt.Errorf("error loading the site configuration '%s': %v", name, err)
+	siteConfig.PathPrefix = siteSettings.Key("pathPrefix").MustString("/")
+	if !strings.HasPrefix(siteConfig.PathPrefix, "/") {
+		siteConfig.PathPrefix = "/" + siteConfig.PathPrefix
 	}
 
 	siteConfig.Domains = siteSettings.Key("domains").Strings(",")
@@ -393,6 +391,8 @@ func LoadSiteConfig(name string, path string, basePath string, server Server) (S
 		siteConfig.ProxyTarget = ""
 	}
 
+	siteConfig.ProxyFlushInterval = siteSettings.Key("proxyFlushInterval").MustInt(0)
+
 	if siteConfig.Proxy {
 		siteConfig.ProxyTarget, ok, err = CheckString(siteSettings.Key("proxyTarget"), true, sectionName, "proxyTarget")
 		if !ok {
@@ -402,6 +402,12 @@ func LoadSiteConfig(name string, path string, basePath string, server Server) (S
 		}
 		fmt.Printf("[INFO] Skipping static files for site '%s' because it is a proxy\n", name)
 	} else {
+		siteConfig.Directory, ok, err = CheckString(siteSettings.Key("directory"), true, sectionName, "directory")
+		if !ok {
+			siteConfig.Enabled = false
+			fmt.Printf("[ERROR] The site %s was deactivated due to incorrect configuration.\n", name)
+			return siteConfig, fmt.Errorf("error loading the site configuration '%s': %v", name, err)
+		}
 		// STATIC FILES
 		staticFiles.Assets, ok, err = CheckString(siteSettings.Key("staticFilesPath"), true, sectionName, "staticFilesPath")
 		if !ok {
