@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/humanjuan/golyn/app"
 	"github.com/humanjuan/golyn/globals"
 	"github.com/humanjuan/golyn/internal/utils"
 )
@@ -25,12 +26,27 @@ func RateLimitMiddleware() gin.HandlerFunc {
 		}
 
 		host := strings.Split(c.Request.Host, ":")[0]
-		vh, exists := virtualHosts[host]
+		path := c.Request.URL.Path
+		vhs, exists := virtualHosts[host]
 		if !exists {
 			log.Warn("RateLimitMiddleware() | Access denied | Host: %s | URL: %s", host, c.Request.URL)
 			err = fmt.Errorf("access denied for host %s", host)
 			c.Error(utils.NewHTTPError(http.StatusForbidden, err.Error()))
 			c.Abort()
+			return
+		}
+
+		var vh *app.VirtualHost
+		for i := range vhs {
+			if vhs[i].PathPrefix == "/" || strings.HasPrefix(path, vhs[i].PathPrefix) {
+				vh = &vhs[i]
+				break
+			}
+		}
+
+		if vh == nil {
+			log.Warn("RateLimitMiddleware() | No matching VirtualHost for path | Host: %s | Path: %s", host, path)
+			c.Next()
 			return
 		}
 

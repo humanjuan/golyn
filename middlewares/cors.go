@@ -20,7 +20,8 @@ func CorsMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		host := strings.Split(c.Request.Host, ":")[0]
+		hostParts := strings.Split(c.Request.Host, ":")
+		host := strings.ToLower(hostParts[0])
 
 		var security loaders.Security
 		if cfg, exists := c.Get("site_config"); exists {
@@ -30,8 +31,14 @@ func CorsMiddleware() gin.HandlerFunc {
 		}
 
 		if security.AllowOrigin == nil {
-			if vh, ok := globals.VirtualHosts[host]; ok {
-				security = vh.Security
+			if vhs, ok := globals.VirtualHosts[host]; ok {
+				path := c.Request.URL.Path
+				for i := range vhs {
+					if vhs[i].PathPrefix == "/" || strings.HasPrefix(path, vhs[i].PathPrefix) {
+						security = vhs[i].Security
+						break
+					}
+				}
 			}
 		}
 

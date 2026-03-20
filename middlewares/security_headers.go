@@ -2,11 +2,11 @@ package middlewares
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/humanjuan/golyn/app"
 	"github.com/humanjuan/golyn/globals"
 	internalcfg "github.com/humanjuan/golyn/internal/config"
 	"github.com/humanjuan/golyn/internal/security"
@@ -28,64 +28,8 @@ func SecurityHeadersMiddleware(siteProvider *internalcfg.SiteProvider, isDev boo
 	}
 
 	return func(c *gin.Context) {
-		host := strings.Split(c.Request.Host, ":")[0]
-		config := globals.GetConfig()
-
-		// Category C - Global Config
-		path := c.Request.URL.Path
-		for _, excluded := range config.Server.ExcludedPaths {
-			if strings.HasPrefix(path, excluded) {
-				c.Next()
-				return
-			}
-		}
-
-		// Category C - Global Config
-		if len(config.Server.GlobalWhitelist) > 0 {
-			clientIPStr := c.ClientIP()
-			clientIP := net.ParseIP(clientIPStr)
-			allowed := false
-
-			// Check for exact matches
-			for _, ip := range config.Server.GlobalWhitelist {
-				if clientIPStr == ip {
-					allowed = true
-					break
-				}
-			}
-
-			// Check for CIDR matches
-			if !allowed && clientIP != nil {
-				for _, network := range config.Server.ParsedWhitelistNetworks {
-					if network.Contains(clientIP) {
-						allowed = true
-						break
-					}
-				}
-			}
-
-			// Check for wildcard matches (e.g., 192.168.1.*)
-			if !allowed {
-				for _, entry := range config.Server.GlobalWhitelist {
-					if strings.Contains(entry, "*") {
-						pattern := strings.ReplaceAll(entry, "*", "")
-						if strings.HasPrefix(clientIPStr, pattern) {
-							allowed = true
-							break
-						}
-					}
-				}
-			}
-
-			if !allowed {
-				log.Warn("SecurityHeadersMiddleware() | IP not in global whitelist | IP: %s | Host: %s", clientIPStr, host)
-				c.AbortWithStatusJSON(http.StatusForbidden, utils.APIResponse{
-					Success: false,
-					Message: "access denied: ip not whitelisted",
-				})
-				return
-			}
-		}
+		hostParts := strings.Split(c.Request.Host, ":")
+		host := strings.ToLower(hostParts[0])
 
 		// TLS policy (platform responsibility)
 		globals.CertMutex.RLock()
@@ -122,19 +66,30 @@ func SecurityHeadersMiddleware(siteProvider *internalcfg.SiteProvider, isDev boo
 		}
 
 		// Resolve site config (dynamic reload by config hash)
-		vh, ok := globals.VirtualHosts[host]
+		vhs, ok := globals.VirtualHosts[host]
 		var siteCSP string
 		var sitePP string
 
 		if ok {
-			siteCfg, err := siteProvider.GetSiteConfig(vh.SiteName, vh.ConfigPath)
-			if err != nil {
-				log.Warn("SecurityHeadersMiddleware() | Failed loading site config | Host: %s | Err: %v", host, err)
-			} else {
-				// Store site config in context for downstream middlewares to avoid global state mutation.
-				c.Set("site_config", siteCfg)
-				siteCSP = siteCfg.Security.ContentSecurityPolicy
-				sitePP = siteCfg.Security.PermissionsPolicy
+			path := c.Request.URL.Path
+			var vh *app.VirtualHost
+			for i := range vhs {
+				if vhs[i].PathPrefix == "/" || strings.HasPrefix(path, vhs[i].PathPrefix) {
+					vh = &vhs[i]
+					break
+				}
+			}
+
+			if vh != nil {
+				siteCfg, err := siteProvider.GetSiteConfig(vh.SiteName, vh.ConfigPath)
+				if err != nil {
+					log.Warn("SecurityHeadersMiddleware() | Failed loading site config | Host: %s | Prefix: %s | Err: %v", host, vh.PathPrefix, err)
+				} else {
+					// Store site config in context for downstream middlewares to avoid global state mutation.
+					c.Set("site_config", siteCfg)
+					siteCSP = siteCfg.Security.ContentSecurityPolicy
+					sitePP = siteCfg.Security.PermissionsPolicy
+				}
 			}
 		}
 
