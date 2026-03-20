@@ -2,22 +2,25 @@ package virtualhosts
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/humanjuan/golyn/app"
 	"github.com/humanjuan/golyn/config/loaders"
 	"github.com/humanjuan/golyn/globals"
 	"github.com/humanjuan/golyn/middlewares"
 	"github.com/humanjuan/golyn/routes"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
-func Setup(router *gin.Engine) map[string]app.VirtualHost {
+func Setup(router *gin.Engine) map[string][]app.VirtualHost {
 	log := globals.GetAppLogger()
 	log.Debug("Setup() | Configured virtual hosts")
 	config := globals.GetConfig()
-	virtualHosts := make(map[string]app.VirtualHost)
+	virtualHosts := make(map[string][]app.VirtualHost)
 
 	for _, siteConfig := range config.Sites {
 		if !siteConfig.Enabled {
@@ -42,12 +45,18 @@ func Setup(router *gin.Engine) map[string]app.VirtualHost {
 
 		var siteGroup *gin.RouterGroup
 		if !siteConfig.Proxy {
-			siteGroup = router.Group(fmt.Sprintf("/%s", siteConfig.Directory))
+			// If path prefix is not root, use it as part of the group path
+			groupPath := fmt.Sprintf("/%s", siteConfig.Directory)
+			if siteConfig.PathPrefix != "/" {
+				groupPath = siteConfig.PathPrefix
+			}
+
+			siteGroup = router.Group(groupPath)
 			{
 				// Secure static file routes
-				siteGroup.GET("/style/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Style, "style"))
-				siteGroup.GET("/js/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Js, "js"))
-				siteGroup.GET("/assets/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Assets, "assets"))
+				siteGroup.GET("/style/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Style))
+				siteGroup.GET("/js/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Js))
+				siteGroup.GET("/assets/*filepath", routes.CreateRouteHandler(siteConfig.StaticFiles.Assets))
 
 				// Serve the index file
 				siteGroup.GET("/", routes.CreateStaticFileHandler(filepath.Join(basePath, "index.html")))
@@ -65,19 +74,30 @@ func Setup(router *gin.Engine) map[string]app.VirtualHost {
 
 		// Asocia cada dominio con el `VirtualHost`
 		for _, domain := range siteConfig.Domains {
-			virtualHosts[domain] = app.VirtualHost{
-				HostName:    domain,
-				SiteName:    siteConfig.Directory,
-				ConfigPath:  siteConfig.Path,
-				BasePath:    basePath,
-				SiteGroup:   siteGroup,
-				Proxy:       siteConfig.Proxy,
-				ProxyTarget: siteConfig.ProxyTarget,
-				Security:    siteConfig.Security,
-				SMTP:        siteConfig.SMTP,
+			vh := app.VirtualHost{
+				HostName:           domain,
+				SiteName:           siteConfig.Directory,
+				ConfigPath:         siteConfig.Path,
+				BasePath:           basePath,
+				SiteGroup:          siteGroup,
+				Proxy:              siteConfig.Proxy,
+				ProxyTarget:        siteConfig.ProxyTarget,
+				ProxyFlushInterval: siteConfig.ProxyFlushInterval,
+				PathPrefix:         siteConfig.PathPrefix,
+				Security:           siteConfig.Security,
+				SMTP:               siteConfig.SMTP,
 			}
-			log.Info("Setup() | Configured virtual host '%s' for site directory: %s", domain, basePath)
+			virtualHosts[domain] = append(virtualHosts[domain], vh)
+			log.Info("Setup() | Configured virtual host '%s%s' for site directory: %s",
+				domain, siteConfig.PathPrefix, basePath)
 		}
+	}
+
+	// Sort VirtualHosts for each domain by PathPrefix length descending (longest match first)
+	for domain := range virtualHosts {
+		sort.Slice(virtualHosts[domain], func(i, j int) bool {
+			return len(virtualHosts[domain][i].PathPrefix) > len(virtualHosts[domain][j].PathPrefix)
+		})
 	}
 
 	globals.DefaultSite = "./sites/golyn"

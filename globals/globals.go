@@ -19,7 +19,7 @@ var (
 	appLogger           *acacia.Log
 	dbLogger            *acacia.Log
 	ErrorTemplate       *template.Template
-	VirtualHosts        map[string]app.VirtualHost
+	VirtualHosts        map[string][]app.VirtualHost
 	DefaultSite         string
 	Certificates        map[string]tls.Certificate
 	InvalidCertificates map[string]bool
