@@ -34,7 +34,7 @@ import (
 // Documentation: https://gin-gonic.com/docs/quickstart/
 
 const (
-	version string = "v1.6.1"
+	version string = "v1.7.0"
 )
 
 func main() {
