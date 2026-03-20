@@ -36,15 +36,17 @@ type Security struct {
 	TLS_SSL               TLS_SSL
 }
 type SiteConfig struct {
-	Enabled     bool
-	Path        string
-	Directory   string
-	Domains     []string
-	Proxy       bool
-	ProxyTarget string
-	StaticFiles StaticFiles
-	Security    Security
-	SMTP        SMTP
+	Enabled            bool
+	Path               string
+	Directory          string
+	Domains            []string
+	Proxy              bool
+	ProxyTarget        string
+	ProxyFlushInterval int
+	PathPrefix         string
+	StaticFiles        StaticFiles
+	Security           Security
+	SMTP               SMTP
 }
 
 type Database struct {
